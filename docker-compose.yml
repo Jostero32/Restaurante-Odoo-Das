@@ -1,0 +1,161 @@
+services:
+  db:
+    image: postgres:15
+    container_name: proyectoDAS-db
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=odoo
+      - POSTGRES_PASSWORD=odoo
+    command: >
+      postgres
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  restore:
+    image: postgres:15
+    container_name: proyectoDAS-restore
+    user: root
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - PGPASSWORD=odoo
+      - DB_NAME=odoo
+    volumes:
+      - ./backups:/backups
+      - odoo-web-data:/var/lib/odoo
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+
+        echo "Verificando backup..."
+
+        if [ ! -f /backups/db_demo.dump ]; then
+          echo "ERROR: No existe /backups/db_demo.dump"
+          exit 1
+        fi
+
+        echo "Eliminando base previa si existe..."
+        dropdb -h db -U odoo --if-exists "$$DB_NAME"
+
+        echo "Creando base $$DB_NAME..."
+        createdb -h db -U odoo "$$DB_NAME"
+
+        echo "Restaurando base de datos..."
+        pg_restore -h db -U odoo -d "$$DB_NAME" /backups/db_demo.dump
+
+        echo "Limpiando assets web cacheados (regenerarán al primer request)..."
+        psql -h db -U odoo -d "$$DB_NAME" -c "DELETE FROM ir_attachment WHERE res_model='ir.ui.view' AND name LIKE '%assets%'; DELETE FROM ir_attachment WHERE url LIKE '/web/assets/%';"
+
+        if [ -d /backups/filestore/$$DB_NAME ]; then
+          echo "Restaurando filestore..."
+          rm -rf /var/lib/odoo/filestore/$$DB_NAME
+          mkdir -p /var/lib/odoo/filestore/$$DB_NAME
+          cp -a /backups/filestore/$$DB_NAME/. /var/lib/odoo/filestore/$$DB_NAME/
+          chmod -R a+rwX /var/lib/odoo/filestore/$$DB_NAME
+
+          echo "Detectando y archivando huérfanos del filestore..."
+          FS_DIR="/var/lib/odoo/filestore/$$DB_NAME"
+          mkdir -p "$$FS_DIR/_orphans_backup"
+          psql -h db -U odoo -d "$$DB_NAME" -At -c "SELECT store_fname FROM ir_attachment WHERE store_fname IS NOT NULL" | sort -u > /tmp/expected.txt
+          ( cd "$$FS_DIR" && find . -type f -not -path './_orphans_backup/*' -printf '%P\n' ) | sort -u > /tmp/actual.txt
+          comm -23 /tmp/actual.txt /tmp/expected.txt > /tmp/orphans.txt
+          ORPHAN_COUNT=$$(wc -l < /tmp/orphans.txt)
+          echo "Huérfanos encontrados: $$ORPHAN_COUNT"
+          while IFS= read -r f; do
+            [ -z "$$f" ] && continue
+            mkdir -p "$$FS_DIR/_orphans_backup/$$(dirname "$$f")"
+            mv "$$FS_DIR/$$f" "$$FS_DIR/_orphans_backup/$$f" || true
+          done < /tmp/orphans.txt
+        else
+          echo "ADVERTENCIA: No existe /backups/filestore/$$DB_NAME"
+        fi
+
+        echo "Restore completado."
+    restart: "no"
+
+  odoo:
+    image: odoo:18
+    container_name: proyectoDAS
+    depends_on:
+      restore:
+        condition: service_completed_successfully
+    ports:
+      - "8071:8069"
+    environment:
+      - HOST=db
+      - USER=odoo
+      - PASSWORD=odoo
+    volumes:
+      - odoo-web-data:/var/lib/odoo
+      - ./addons:/mnt/extra-addons
+      - ./backups:/backups
+      - ./scripts:/scripts
+    restart: always
+
+  backup:
+    image: postgres:15
+    container_name: proyectoDAS-backup
+    user: root
+    profiles:
+      - tools
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - PGPASSWORD=odoo
+      - DB_NAME=odoo
+    volumes:
+      - ./backups:/backups
+      - odoo-web-data:/var/lib/odoo
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+
+        echo "Limpiando assets cacheados en la BD antes del dump..."
+        psql -h db -U odoo -d "$$DB_NAME" -c "DELETE FROM ir_attachment WHERE url LIKE '/web/assets/%' OR url LIKE '/web/content/%-web.assets_%' OR name LIKE 'web.assets_%' OR (res_model = 'ir.ui.view' AND name ILIKE '%assets%');"
+
+        echo "Creando backup de la base $$DB_NAME..."
+        pg_dump -h db -U odoo -d "$$DB_NAME" -F c -f /backups/db_demo.dump
+
+        echo "Copiando filestore..."
+        rm -rf /backups/filestore/$$DB_NAME
+        mkdir -p /backups/filestore/$$DB_NAME
+
+        if [ -d /var/lib/odoo/filestore/$$DB_NAME ]; then
+          cp -a /var/lib/odoo/filestore/$$DB_NAME/. /backups/filestore/$$DB_NAME/
+
+          echo "Filtrando huérfanos del filestore en el backup..."
+          BK_DIR="/backups/filestore/$$DB_NAME"
+          rm -rf "$$BK_DIR/_orphans_backup"
+          psql -h db -U odoo -d "$$DB_NAME" -At -c "SELECT store_fname FROM ir_attachment WHERE store_fname IS NOT NULL" | sort -u > /tmp/expected.txt
+          ( cd "$$BK_DIR" && find . -type f -printf '%P\n' ) | sort -u > /tmp/actual.txt
+          comm -23 /tmp/actual.txt /tmp/expected.txt > /tmp/orphans.txt
+          ORPHAN_COUNT=$$(wc -l < /tmp/orphans.txt)
+          echo "Huérfanos eliminados del backup: $$ORPHAN_COUNT"
+          while IFS= read -r f; do
+            [ -z "$$f" ] && continue
+            rm -f "$$BK_DIR/$$f"
+          done < /tmp/orphans.txt
+          find "$$BK_DIR" -type d -empty -delete 2>/dev/null || true
+        else
+          echo "No existe filestore para $$DB_NAME."
+        fi
+
+        echo "Backup completado en ./backups"
+
+volumes:
+  odoo-db-data:
+  odoo-web-data:
