@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="0">
+
+        <record id="module_category_restaurant_casa_vieja" model="ir.module.category">
+            <field name="name">Restaurante Casa Vieja</field>
+            <field name="description">Roles operativos del Restaurante Casa Vieja (ARCM Solutions).</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="group_restaurant_repartidor" model="res.groups">
+            <field name="name">Repartidor Restaurante</field>
+            <field name="category_id" ref="module_category_restaurant_casa_vieja"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Repartidor a domicilio. Lee pedidos asignados y actualiza su estado.</field>
+        </record>
+
+        <record id="group_restaurant_cocinero" model="res.groups">
+            <field name="name">Cocinero Restaurante</field>
+            <field name="category_id" ref="module_category_restaurant_casa_vieja"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Personal de cocina. Solo lectura sobre los modelos operativos.</field>
+        </record>
+
+        <record id="group_restaurant_mesero" model="res.groups">
+            <field name="name">Mesero Restaurante</field>
+            <field name="category_id" ref="module_category_restaurant_casa_vieja"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+            <field name="comment">Personal de salón. Toma reservas y pedidos, no elimina.</field>
+        </record>
+
+        <record id="group_restaurant_administracion" model="res.groups">
+            <field name="name">Administración Restaurante</field>
+            <field name="category_id" ref="module_category_restaurant_casa_vieja"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('group_restaurant_mesero'))]"/>
+            <field name="comment">Coordinación operativa. Crea y edita todos los registros, no elimina.</field>
+        </record>
+
+        <record id="group_restaurant_administrador" model="res.groups">
+            <field name="name">Administrador Restaurante</field>
+            <field name="category_id" ref="module_category_restaurant_casa_vieja"/>
+            <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('group_restaurant_administracion')), (4, ref('group_restaurant_cocinero')), (4, ref('group_restaurant_repartidor'))]"/>
+            <field name="comment">Rol con control total (CRUD) sobre los modelos del módulo.</field>
+        </record>
+
+    </data>
+</odoo>
