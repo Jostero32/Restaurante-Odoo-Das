@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem
+        id="menu_restaurant_casa_vieja_root"
+        name="Restaurante Casa Vieja"
+        sequence="10"
+        web_icon="restaurant_casa_vieja_base,static/description/icon.png"/>
+</odoo>
