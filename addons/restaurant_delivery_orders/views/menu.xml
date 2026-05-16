@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem
+        id="menu_restaurant_delivery_root"
+        name="Delivery"
+        parent="restaurant_casa_vieja_base.menu_restaurant_casa_vieja_root"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_restaurant_delivery_orders"
+        name="Pedidos"
+        parent="menu_restaurant_delivery_root"
+        action="action_restaurant_delivery_orders"
+        sequence="10"/>
+</odoo>
