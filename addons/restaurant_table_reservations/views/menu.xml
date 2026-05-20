@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem
+        id="menu_restaurant_reservations_root"
+        name="Reservas"
+        parent="restaurant_casa_vieja_base.menu_restaurant_casa_vieja_root"
+        sequence="30"/>
+
+    <menuitem
+        id="menu_restaurant_table_reservations"
+        name="Reservas"
+        parent="menu_restaurant_reservations_root"
+        action="action_restaurant_table_reservations"
+        sequence="10"/>
+
+    <menuitem
+        id="menu_restaurant_tables"
+        name="Mesas"
+        parent="menu_restaurant_reservations_root"
+        action="action_restaurant_tables"
+        sequence="20"/>
+</odoo>
