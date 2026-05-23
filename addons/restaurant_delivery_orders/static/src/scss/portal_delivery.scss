@@ -1,0 +1,127 @@
+.rcv-delivery-card {
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    border-radius: 14px;
+}
+
+.rcv-delivery-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.75rem 1.5rem rgba(17, 24, 39, 0.15) !important;
+}
+
+.rcv-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 999px;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    width: 100%;
+}
+
+.rcv-pill-eta {
+    background: #e8f0fe;
+    color: #1d4ed8;
+}
+
+.rcv-pill-total {
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.rcv-address {
+    padding: 0.7rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #f9fafb;
+}
+
+.rcv-delivery-detail .rcv-detail-hero {
+    border-radius: 16px;
+}
+
+.rcv-kpi {
+    border-radius: 12px;
+    background: #111827;
+    color: #ffffff;
+    padding: 0.75rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.rcv-kpi small {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    opacity: 0.78;
+}
+
+.rcv-kpi strong {
+    font-size: 1rem;
+}
+
+.rcv-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.rcv-progress-item {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    color: #6b7280;
+}
+
+.rcv-progress-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #d1d5db;
+    background: #ffffff;
+    flex: 0 0 auto;
+}
+
+.rcv-progress-item.is-done .rcv-progress-dot {
+    border-color: #16a34a;
+    background: #16a34a;
+}
+
+.rcv-progress-item.is-current .rcv-progress-dot {
+    border-color: #2563eb;
+    background: #2563eb;
+}
+
+.rcv-progress-item.is-done .rcv-progress-label,
+.rcv-progress-item.is-current .rcv-progress-label {
+    color: #111827;
+    font-weight: 600;
+}
+
+.rcv-info-block {
+    padding: 0.7rem;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+}
+
+.rcv-info-block small {
+    display: block;
+    color: #6b7280;
+    margin-bottom: 0.2rem;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+}
+
+.rcv-incident-item {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0.65rem;
+    background: #ffffff;
+}
+
+@media (max-width: 991px) {
+    .rcv-kpi {
+        min-height: auto;
+    }
+}

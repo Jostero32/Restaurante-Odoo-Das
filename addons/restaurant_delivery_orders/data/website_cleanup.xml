@@ -2,6 +2,7 @@
 <odoo>
     <function model="restaurant.delivery.order" name="_cleanup_admin_repartidor_membership"/>
     <function model="restaurant.delivery.order" name="_lockdown_repartidor_backend_menus"/>
+    <function model="sale.order" name="_sync_delivery_orders_for_existing_sales"/>
     <function model="restaurant.delivery.order" name="_migrate_legacy_delivery_orders"/>
     <function model="restaurant.delivery.order" name="_disable_ecommerce_terms_block"/>
 </odoo>

@@ -5,7 +5,7 @@ from odoo.exceptions import AccessError, UserError, ValidationError
 class RestaurantDeliveryOrder(models.Model):
     _name = "restaurant.delivery.order"
     _description = "Pedido a domicilio"
-    _inherit = ["mail.thread", "mail.activity.mixin"]
+    _inherit = ["mail.thread", "mail.activity.mixin", "portal.mixin"]
     _order = "order_datetime desc, id desc"
 
     name = fields.Char(
@@ -32,6 +32,12 @@ class RestaurantDeliveryOrder(models.Model):
     )
     eta_minutes = fields.Integer(string="ETA minutos", default=35, tracking=True)
     amount_total = fields.Monetary(string="Total", currency_field="currency_id", tracking=True)
+    company_id = fields.Many2one(
+        "res.company",
+        string="Compania",
+        default=lambda self: self.env.company,
+        required=True,
+    )
     currency_id = fields.Many2one(
         "res.currency",
         string="Moneda",
@@ -41,10 +47,10 @@ class RestaurantDeliveryOrder(models.Model):
     notes = fields.Text(string="Notas")
     state = fields.Selection(
         [
-            ("draft", "Borrador"),
-            ("confirmed", "Confirmado"),
+            ("draft", "Recibido"),
+            ("confirmed", "En preparacion"),
             ("assigned", "Asignado"),
-            ("on_route", "En ruta"),
+            ("on_route", "En camino"),
             ("delivered", "Entregado"),
             ("cancelled", "Cancelado"),
         ],
@@ -54,10 +60,44 @@ class RestaurantDeliveryOrder(models.Model):
         tracking=True,
     )
 
+    sale_order_id = fields.Many2one(
+        "sale.order",
+        string="Pedido de venta",
+        copy=False,
+        tracking=True,
+    )
+    product_summary = fields.Text(string="Productos del pedido", compute="_compute_product_summary")
+    linked_invoice_ids = fields.Many2many(
+        "account.move",
+        string="Facturas relacionadas",
+        compute="_compute_invoice_metrics",
+        readonly=True,
+    )
+    invoice_count = fields.Integer(string="Facturas", compute="_compute_invoice_metrics")
+    invoice_paid_count = fields.Integer(string="Facturas pagadas", compute="_compute_invoice_metrics")
+    invoice_pending_count = fields.Integer(string="Facturas pendientes", compute="_compute_invoice_metrics")
+    invoice_residual_amount = fields.Monetary(
+        string="Saldo pendiente",
+        compute="_compute_invoice_metrics",
+        currency_field="currency_id",
+    )
+
+    incident_ids = fields.One2many(
+        "restaurant.delivery.incident",
+        "delivery_order_id",
+        string="Incidencias",
+    )
+    incident_count = fields.Integer(string="Total incidencias", compute="_compute_incident_count")
+    customer_status_label = fields.Char(string="Estado para cliente", compute="_compute_customer_status_label")
+
     @api.model
     def _driver_domain(self):
-        repartidor_group = self.env.ref("restaurant_casa_vieja_base.group_restaurant_repartidor", raise_if_not_found=False)
-        administrador_group = self.env.ref("restaurant_casa_vieja_base.group_restaurant_administrador", raise_if_not_found=False)
+        repartidor_group = self.env.ref(
+            "restaurant_casa_vieja_base.group_restaurant_repartidor", raise_if_not_found=False
+        )
+        administrador_group = self.env.ref(
+            "restaurant_casa_vieja_base.group_restaurant_administrador", raise_if_not_found=False
+        )
         domain = [("share", "=", False)]
         if repartidor_group:
             domain.append(("groups_id", "in", [repartidor_group.id]))
@@ -71,6 +111,83 @@ class RestaurantDeliveryOrder(models.Model):
         tracking=True,
         domain=lambda self: self._driver_domain(),
     )
+
+    @api.depends("incident_ids")
+    def _compute_incident_count(self):
+        for order in self:
+            order.incident_count = len(order.incident_ids)
+
+    @api.depends(
+        "sale_order_id",
+        "sale_order_id.order_line",
+        "sale_order_id.order_line.display_type",
+        "sale_order_id.order_line.name",
+        "sale_order_id.order_line.product_uom_qty",
+        "sale_order_id.order_line.product_uom",
+    )
+    def _compute_product_summary(self):
+        for order in self:
+            lines = order.sale_order_id.sudo().order_line.filtered(lambda line: not line.display_type)
+            if not lines:
+                order.product_summary = ""
+                continue
+            chunks = []
+            for line in lines:
+                uom_name = line.product_uom.name if line.product_uom else ""
+                if uom_name:
+                    chunks.append(f"- {line.name} x {line.product_uom_qty:g} {uom_name}")
+                else:
+                    chunks.append(f"- {line.name} x {line.product_uom_qty:g}")
+            order.product_summary = "\n".join(chunks)
+
+    @api.depends(
+        "sale_order_id",
+        "sale_order_id.invoice_ids",
+        "sale_order_id.invoice_ids.move_type",
+        "sale_order_id.invoice_ids.state",
+        "sale_order_id.invoice_ids.payment_state",
+        "sale_order_id.invoice_ids.amount_residual",
+    )
+    def _compute_invoice_metrics(self):
+        customer_invoice_types = {"out_invoice", "out_refund", "out_receipt"}
+        for order in self:
+            invoices = order.sale_order_id.sudo().invoice_ids.filtered(
+                lambda inv: inv.move_type in customer_invoice_types and inv.state != "cancel"
+            )
+            posted_invoices = invoices.filtered(lambda inv: inv.state == "posted")
+            pending_invoices = posted_invoices.filtered(
+                lambda inv: inv.payment_state not in {"paid", "reversed"}
+            )
+            paid_invoices = posted_invoices.filtered(
+                lambda inv: inv.payment_state in {"paid", "reversed"}
+            )
+
+            order.linked_invoice_ids = invoices
+            order.invoice_count = len(invoices)
+            order.invoice_pending_count = len(pending_invoices)
+            order.invoice_paid_count = len(paid_invoices)
+            order.invoice_residual_amount = sum(posted_invoices.mapped("amount_residual")) if posted_invoices else 0.0
+
+    def _get_customer_state_label(self, state_value=None):
+        mapping = {
+            "draft": _("En preparacion"),
+            "confirmed": _("En preparacion"),
+            "assigned": _("En preparacion"),
+            "on_route": _("En camino"),
+            "delivered": _("Entregado"),
+            "cancelled": _("Cancelado"),
+        }
+        return mapping.get(state_value or self.state, _("En proceso"))
+
+    @api.depends("state")
+    def _compute_customer_status_label(self):
+        for order in self:
+            order.customer_status_label = order._get_customer_state_label(order.state)
+
+    def _compute_access_url(self):
+        super()._compute_access_url()
+        for order in self:
+            order.access_url = f"/my/delivery/{order.id}"
 
     @api.model
     def _is_repartidor_only_user(self):
@@ -87,23 +204,106 @@ class RestaurantDeliveryOrder(models.Model):
             raise AccessError(_("No tiene permisos para crear pedidos delivery."))
         for vals in vals_list:
             if not vals.get("name") or vals["name"] == _("Nuevo pedido"):
-                vals["name"] = self.env["ir.sequence"].next_by_code("restaurant.delivery.order") or _("Nuevo pedido")
-        return super().create(vals_list)
+                vals["name"] = self.env["ir.sequence"].next_by_code("restaurant.delivery.order") or _(
+                    "Nuevo pedido"
+                )
+        orders = super().create(vals_list)
+        if not self.env.context.get("skip_delivery_customer_notify"):
+            orders._notify_customer_status_change(force_states={"confirmed", "assigned", "on_route"})
+        if not self.env.context.get("skip_delivery_internal_notify"):
+            orders._notify_internal_new_website_order()
+        return orders
+
+    def _notify_internal_new_website_order(self):
+        website_orders = self.filtered(lambda order: order.sale_order_id and order.sale_order_id.website_id)
+        if not website_orders:
+            return
+
+        todo_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+        if not todo_type:
+            return
+
+        users = self.env["res.users"]
+        for group_xmlid in [
+            "restaurant_casa_vieja_base.group_restaurant_cocinero",
+            "restaurant_casa_vieja_base.group_restaurant_repartidor",
+            "restaurant_casa_vieja_base.group_restaurant_administracion",
+            "restaurant_casa_vieja_base.group_restaurant_administrador",
+        ]:
+            group = self.env.ref(group_xmlid, raise_if_not_found=False)
+            if group:
+                users |= group.sudo().users.filtered(lambda user: user.active and not user.share)
+        if not users:
+            return
+
+        model_id = self.env["ir.model"]._get_id("restaurant.delivery.order")
+        deadline = fields.Date.context_today(self)
+        activity_vals = []
+        for order in website_orders:
+            order.sudo().message_post(
+                body=_(
+                    "Nuevo pedido web confirmado. Estado operativo: En preparacion. "
+                    "Revisar alistamiento y asignacion de ruta."
+                ),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
+            for user in users:
+                activity_vals.append(
+                    {
+                        "activity_type_id": todo_type.id,
+                        "res_model_id": model_id,
+                        "res_id": order.id,
+                        "user_id": user.id,
+                        "summary": _("Nuevo pedido web en preparacion"),
+                        "note": _("Pedido %s listo para alistar y despachar.") % (order.name,),
+                        "date_deadline": deadline,
+                    }
+                )
+        if activity_vals:
+            self.env["mail.activity"].sudo().create(activity_vals)
 
     def write(self, vals):
+        previous_states = {order.id: order.state for order in self}
         if self._is_repartidor_only_user():
             allowed_fields = {"state", "notes"}
             forbidden_fields = set(vals) - allowed_fields
             if forbidden_fields:
-                raise AccessError(_("Como repartidor solo puede actualizar el estado y notas operativas del pedido."))
+                raise AccessError(
+                    _("Como repartidor solo puede actualizar el estado y notas operativas del pedido.")
+                )
             if "state" in vals and vals["state"] not in {"on_route", "delivered"}:
-                raise AccessError(_("Como repartidor solo puede cambiar el estado a En ruta o Entregado."))
-        return super().write(vals)
+                raise AccessError(_("Como repartidor solo puede cambiar el estado a En camino o Entregado."))
+        result = super().write(vals)
+        if "state" in vals:
+            changed = self.filtered(lambda order: previous_states.get(order.id) != order.state)
+            changed._notify_customer_status_change()
+        return result
 
     def unlink(self):
         if self._is_repartidor_only_user():
             raise AccessError(_("No tiene permisos para eliminar pedidos delivery."))
         return super().unlink()
+
+    def _notify_customer_status_change(self, force_states=None):
+        force_states = force_states or set()
+        template = self.env.ref(
+            "restaurant_delivery_orders.mail_template_delivery_status_update", raise_if_not_found=False
+        )
+        for order in self:
+            if order.state not in {"confirmed", "assigned", "on_route", "delivered", "cancelled"} and order.state not in force_states:
+                continue
+            partner = order.partner_id or order.sale_order_id.partner_id
+            if not partner or not partner.email:
+                continue
+            email_values = {"email_to": partner.email}
+            if template:
+                template.sudo().send_mail(order.id, force_send=False, email_values=email_values)
+            order.message_post(
+                body=_("Actualizacion de estado enviada al cliente: %s", order._get_customer_state_label()),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
 
     @api.model
     def _disable_ecommerce_terms_block(self):
@@ -127,7 +327,7 @@ class RestaurantDeliveryOrder(models.Model):
             """
             UPDATE restaurant_delivery_order
                SET customer_name = 'Cliente no especificado'
-            WHERE customer_name IS NULL OR btrim(customer_name) = ''
+             WHERE customer_name IS NULL OR btrim(customer_name) = ''
             """
         )
 
@@ -172,6 +372,7 @@ class RestaurantDeliveryOrder(models.Model):
     def _lockdown_repartidor_backend_menus(self):
         # Repartidor mantiene acceso al backend, pero solo debe operar su flujo de delivery.
         allowed_non_driver_groups = [
+            "restaurant_casa_vieja_base.group_restaurant_cocinero",
             "restaurant_casa_vieja_base.group_restaurant_mesero",
             "restaurant_casa_vieja_base.group_restaurant_administracion",
             "restaurant_casa_vieja_base.group_restaurant_administrador",

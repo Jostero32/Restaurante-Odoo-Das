@@ -6,11 +6,14 @@
         <field name="arch" type="xml">
             <list string="Pedidos Delivery">
                 <field name="name"/>
+                <field name="sale_order_id"/>
                 <field name="customer_name"/>
                 <field name="customer_phone"/>
                 <field name="driver_id"/>
                 <field name="eta_minutes"/>
                 <field name="amount_total"/>
+                <field name="invoice_pending_count" string="Facturas pendientes"/>
+                <field name="incident_count" string="Incidencias"/>
                 <field name="state"/>
             </list>
         </field>
@@ -24,7 +27,7 @@
                 <header>
                     <button name="action_confirm" string="Confirmar" type="object" class="btn-primary" invisible="state != 'draft'"/>
                     <button name="action_assign" string="Asignar" type="object" class="btn-primary" invisible="state != 'confirmed'"/>
-                    <button name="action_on_route" string="En ruta" type="object" class="btn-primary" invisible="state != 'assigned'"/>
+                    <button name="action_on_route" string="En camino" type="object" class="btn-primary" invisible="state != 'assigned'"/>
                     <button name="action_delivered" string="Entregado" type="object" class="btn-primary" invisible="state != 'on_route'"/>
                     <button name="action_cancel" string="Cancelar" type="object" invisible="state in ('delivered', 'cancelled')"/>
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,assigned,on_route,delivered"/>
@@ -33,6 +36,8 @@
                     <group>
                         <group>
                             <field name="name" readonly="1"/>
+                            <field name="sale_order_id"/>
+                            <field name="partner_id"/>
                             <field name="customer_name"/>
                             <field name="customer_phone"/>
                             <field name="delivery_address"/>
@@ -46,8 +51,46 @@
                         </group>
                     </group>
                     <notebook>
+                        <page string="Productos">
+                            <field name="product_summary" readonly="1" widget="text" nolabel="1"
+                                   placeholder="Los productos del pedido se mostraran aqui cuando exista un pedido de venta vinculado."/>
+                        </page>
                         <page string="Notas">
                             <field name="notes"/>
+                        </page>
+                        <page string="Facturas">
+                            <group>
+                                <group>
+                                    <field name="invoice_count" readonly="1"/>
+                                    <field name="invoice_paid_count" readonly="1"/>
+                                </group>
+                                <group>
+                                    <field name="invoice_pending_count" readonly="1"/>
+                                    <field name="invoice_residual_amount" readonly="1"/>
+                                </group>
+                            </group>
+                            <field name="linked_invoice_ids" readonly="1">
+                                <list string="Facturas relacionadas" create="false" delete="false">
+                                    <field name="name"/>
+                                    <field name="invoice_date"/>
+                                    <field name="invoice_date_due"/>
+                                    <field name="amount_total"/>
+                                    <field name="amount_residual"/>
+                                    <field name="payment_state"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Incidencias">
+                            <field name="incident_ids" context="{'default_delivery_order_id': id, 'default_partner_id': partner_id}" readonly="0">
+                                <list string="Incidencias" editable="bottom" delete="false">
+                                    <field name="reported_datetime"/>
+                                    <field name="issue_type"/>
+                                    <field name="partner_id"/>
+                                    <field name="description"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
                         </page>
                     </notebook>
                 </sheet>
@@ -61,7 +104,7 @@
         <field name="res_model">restaurant.delivery.order</field>
         <field name="view_mode">list,form</field>
         <field name="context">{'default_state': 'draft'}</field>
-        <field name="groups_id" eval="[(6, 0, [ref('restaurant_casa_vieja_base.group_restaurant_mesero'), ref('restaurant_casa_vieja_base.group_restaurant_administracion'), ref('restaurant_casa_vieja_base.group_restaurant_administrador')])]"/>
+        <field name="groups_id" eval="[(6, 0, [ref('restaurant_casa_vieja_base.group_restaurant_cocinero'), ref('restaurant_casa_vieja_base.group_restaurant_mesero'), ref('restaurant_casa_vieja_base.group_restaurant_administracion'), ref('restaurant_casa_vieja_base.group_restaurant_administrador')])]"/>
     </record>
 
     <record id="view_restaurant_delivery_order_search_driver" model="ir.ui.view">
@@ -75,9 +118,8 @@
                 <field name="delivery_address"/>
                 <field name="state"/>
                 <separator/>
-                <filter name="pending_orders" string="Pendientes" domain="[('state', 'in', ['assigned', 'on_route'])]"/>
-                <filter name="assigned_orders" string="Por salir" domain="[('state', '=', 'assigned')]"/>
-                <filter name="on_route_orders" string="En ruta" domain="[('state', '=', 'on_route')]"/>
+                <filter name="preparing_orders" string="En preparacion" domain="[('state', 'in', ['draft', 'confirmed', 'assigned'])]"/>
+                <filter name="on_route_orders" string="En camino" domain="[('state', '=', 'on_route')]"/>
                 <filter name="delivered_orders" string="Entregados" domain="[('state', '=', 'delivered')]"/>
                 <separator/>
                 <filter name="group_by_state" string="Agrupar por estado" context="{'group_by': 'state'}"/>
@@ -112,11 +154,11 @@
                                     </div>
                                 </div>
                                 <div>
-                                    <span t-if="record.state.raw_value == 'assigned'" class="badge text-bg-info">Por salir</span>
-                                    <span t-if="record.state.raw_value == 'on_route'" class="badge text-bg-warning">En ruta</span>
+                                    <span t-if="record.state.raw_value == 'assigned'" class="badge text-bg-info">En preparacion</span>
+                                    <span t-if="record.state.raw_value == 'on_route'" class="badge text-bg-warning">En camino</span>
                                     <span t-if="record.state.raw_value == 'delivered'" class="badge text-bg-success">Entregado</span>
                                     <span t-if="record.state.raw_value == 'cancelled'" class="badge text-bg-secondary">Cancelado</span>
-                                    <span t-if="record.state.raw_value not in ['assigned', 'on_route', 'delivered', 'cancelled']" class="badge text-bg-light">Pendiente</span>
+                                    <span t-if="record.state.raw_value != 'assigned' and record.state.raw_value != 'on_route' and record.state.raw_value != 'delivered' and record.state.raw_value != 'cancelled'" class="badge text-bg-light">En preparacion</span>
                                 </div>
                             </div>
                             <div class="rounded-3 border p-2 bg-light-subtle">
@@ -132,11 +174,11 @@
                                 </div>
                             </div>
                             <div class="d-flex flex-wrap gap-2">
-                                <a t-if="record.customer_phone.raw_value" t-att-href="'tel:%s' % record.customer_phone.raw_value" class="btn btn-outline-secondary btn-sm" role="button">
+                                <a t-if="record.customer_phone.raw_value" t-att-href="'tel:' + record.customer_phone.raw_value" class="btn btn-outline-secondary btn-sm" role="button">
                                     <i class="fa fa-phone me-1" title="Llamar al cliente"/>Llamar
                                 </a>
                                 <button name="action_on_route" type="object" class="btn btn-primary btn-sm" t-if="record.state.raw_value == 'assigned'">
-                                    <i class="fa fa-motorcycle me-1" title="Iniciar ruta"/>Iniciar ruta
+                                    <i class="fa fa-motorcycle me-1" title="Iniciar recorrido"/>Iniciar recorrido
                                 </button>
                                 <button name="action_delivered" type="object" class="btn btn-success btn-sm" t-if="record.state.raw_value == 'on_route'">
                                     <i class="fa fa-check me-1" title="Marcar entregado"/>Marcar entregado
@@ -174,7 +216,7 @@
         <field name="arch" type="xml">
             <form string="Mi pedido delivery" create="false" delete="false">
                 <header>
-                    <button name="action_on_route" string="Iniciar ruta" type="object" class="btn-primary" invisible="state != 'assigned'"/>
+                    <button name="action_on_route" string="Iniciar recorrido" type="object" class="btn-primary" invisible="state != 'assigned'"/>
                     <button name="action_delivered" string="Marcar entregado" type="object" class="btn-success" invisible="state != 'on_route'"/>
                     <field name="state" widget="statusbar" statusbar_visible="assigned,on_route,delivered,cancelled"/>
                 </header>
@@ -233,6 +275,9 @@
                         <field name="delivery_address" readonly="1"/>
                     </group>
                     <notebook>
+                        <page string="Productos">
+                            <field name="product_summary" readonly="1" widget="text" nolabel="1"/>
+                        </page>
                         <page string="Notas operativas">
                             <field name="notes" placeholder="Ejemplo: Cliente confirma pago contraentrega, acceso por porteria, etc."/>
                         </page>
@@ -248,7 +293,7 @@
         <field name="view_mode">kanban,list,form</field>
         <field name="domain">[('driver_id', '=', uid)]</field>
         <field name="search_view_id" ref="view_restaurant_delivery_order_search_driver"/>
-        <field name="context">{'search_default_pending_orders': 1, 'create': False}</field>
+        <field name="context">{'search_default_preparing_orders': 1, 'create': False}</field>
         <field name="groups_id" eval="[(6, 0, [ref('restaurant_casa_vieja_base.group_restaurant_repartidor')])]"/>
     </record>
 
