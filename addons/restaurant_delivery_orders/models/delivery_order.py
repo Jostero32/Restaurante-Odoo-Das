@@ -55,6 +55,39 @@ class RestaurantDeliveryOrder(models.Model):
         tracking=True,
     )
 
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            if not vals.get("name") or vals["name"] == _("Nuevo pedido"):
+                vals["name"] = self.env["ir.sequence"].next_by_code("restaurant.delivery.order") or _("Nuevo pedido")
+        return super().create(vals_list)
+
+    @api.model
+    def _disable_ecommerce_terms_block(self):
+        terms_view = self.env["ir.ui.view"].sudo().search(
+            [("key", "=", "website_sale.product_custom_text"), ("active", "=", True)],
+            limit=1,
+        )
+        if terms_view:
+            terms_view.write({"active": False})
+
+    @api.model
+    def _migrate_legacy_delivery_orders(self):
+        self.env.cr.execute(
+            """
+            UPDATE restaurant_delivery_order
+               SET state = 'on_route'
+             WHERE state = 'on_the_way'
+            """
+        )
+        self.env.cr.execute(
+            """
+            UPDATE restaurant_delivery_order
+               SET customer_name = 'Cliente no especificado'
+             WHERE customer_name IS NULL OR btrim(customer_name) = ''
+            """
+        )
+
     @api.constrains("eta_minutes")
     def _check_eta_minutes(self):
         for order in self:
@@ -62,18 +95,33 @@ class RestaurantDeliveryOrder(models.Model):
                 raise ValidationError(_("El ETA no puede ser negativo."))
 
     def action_confirm(self):
+        invalid = self.filtered(lambda order: order.state != "draft")
+        if invalid:
+            raise UserError(_("Solo se pueden confirmar pedidos en borrador."))
         self.write({"state": "confirmed"})
 
     def action_assign(self):
+        invalid = self.filtered(lambda order: order.state != "confirmed")
+        if invalid:
+            raise UserError(_("Solo se pueden asignar pedidos confirmados."))
         for order in self:
             if not order.driver_id:
                 raise UserError(_("Asigne un repartidor antes de marcar el pedido como asignado."))
         self.write({"state": "assigned"})
 
     def action_on_route(self):
+        invalid = self.filtered(lambda order: order.state != "assigned")
+        if invalid:
+            raise UserError(_("Solo se pueden pasar a en ruta pedidos asignados."))
+        without_driver = self.filtered(lambda order: not order.driver_id)
+        if without_driver:
+            raise UserError(_("No se puede poner en ruta un pedido sin repartidor asignado."))
         self.write({"state": "on_route"})
 
     def action_delivered(self):
+        invalid = self.filtered(lambda order: order.state != "on_route")
+        if invalid:
+            raise UserError(_("Solo se pueden entregar pedidos en ruta."))
         self.write({"state": "delivered"})
 
     def action_cancel(self):

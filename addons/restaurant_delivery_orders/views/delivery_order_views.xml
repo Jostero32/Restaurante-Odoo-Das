@@ -32,7 +32,7 @@
                 <sheet>
                     <group>
                         <group>
-                            <field name="name"/>
+                            <field name="name" readonly="1"/>
                             <field name="customer_name"/>
                             <field name="customer_phone"/>
                             <field name="delivery_address"/>
