@@ -13,7 +13,6 @@ class RestaurantTable(models.Model):
         [
             ("main", "Interior"),
             ("patio", "Patio"),
-            ("private", "Privado"),
         ],
         string="Zona",
         default="main",

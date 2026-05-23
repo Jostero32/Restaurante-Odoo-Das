@@ -21,7 +21,6 @@ class RestaurantTableReservation(models.Model):
         [
             ("main", "Interior"),
             ("patio", "Patio"),
-            ("private", "Privado"),
         ],
         string="Zona preferida",
         required=True,

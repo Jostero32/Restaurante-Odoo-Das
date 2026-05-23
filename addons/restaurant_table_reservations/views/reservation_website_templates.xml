@@ -9,7 +9,7 @@
                         <p class="o_reservation_kicker">Restaurante Casa Vieja</p>
                         <h1>Reserva tu mesa en tiempo real</h1>
                         <p>
-                               Elige si prefieres salón principal, patio o zona privada. La reserva
+                               Elige si prefieres el salón interior o el patio. La reserva
                             bloquea la mesa por 1 hora y 15 minutos, incluyendo margen de salida.
                         </p>
                     </div>
@@ -55,7 +55,6 @@
                                             <select id="zone" name="zone" class="form-select" required="required">
                                                 <option value="main" t-att-selected="selected_zone == 'main' and 'selected' or None">Interior</option>
                                                 <option value="patio" t-att-selected="selected_zone == 'patio' and 'selected' or None">Patio</option>
-                                                <option value="private" t-att-selected="selected_zone == 'private' and 'selected' or None">Privado</option>
                                             </select>
                                     </div>
                                     <div class="col-12">
@@ -83,7 +82,7 @@
                         <div class="col-lg-5">
                             <aside class="o_reservation_sidebar">
                                 <h2>Mesas y zonas</h2>
-                                <p>Interior, exterior y áreas privadas se muestran por separado para que elijas la experiencia que buscas.</p>
+                                <p>Interior y patio se muestran por separado para que elijas la experiencia que buscas.</p>
                                 <div class="o_sidebar_card">
                                     <strong>Disponible en vivo</strong>
                                     <p id="availability_feedback">Selecciona fecha, hora y zona para ver mesas.</p>

@@ -37,7 +37,6 @@ class RestaurantTableReservationController(http.Controller):
         zone_options = [
             ("main", "Interior"),
             ("patio", "Patio"),
-            ("private", "Privado"),
         ]
 
         return {
@@ -80,7 +79,6 @@ class RestaurantTableReservationController(http.Controller):
                     "zone_label": {
                         "main": "Interior",
                         "patio": "Patio",
-                        "private": "Privado",
                     }.get(table["zone"], table["zone"]),
                     "notes": table["notes"] or "",
                 }
