@@ -4,6 +4,7 @@
         id="menu_restaurant_reservations_root"
         name="Reservas"
         parent="restaurant_casa_vieja_base.menu_restaurant_casa_vieja_root"
+        groups="restaurant_casa_vieja_base.group_restaurant_mesero,restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
         sequence="30"/>
 
     <menuitem
@@ -11,6 +12,7 @@
         name="Reservas"
         parent="menu_restaurant_reservations_root"
         action="action_restaurant_table_reservations"
+        groups="restaurant_casa_vieja_base.group_restaurant_mesero,restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
         sequence="10"/>
 
     <menuitem
@@ -18,5 +20,6 @@
         name="Mesas"
         parent="menu_restaurant_reservations_root"
         action="action_restaurant_tables"
+        groups="restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
         sequence="20"/>
 </odoo>

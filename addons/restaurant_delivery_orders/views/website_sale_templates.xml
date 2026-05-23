@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="website_sale_product_delivery_ux" inherit_id="website_sale.product" name="Producto - UX Delivery Restaurante">
+        <xpath expr="//div[@t-field='product.description_ecommerce']" position="after">
+            <t t-if="product.website_description and not product.description_ecommerce">
+                <div id="o_food_top_description" class="alert alert-light border rounded-3 mt-2 mb-3" itemprop="description">
+                    <div t-field="product.website_description"/>
+                </div>
+            </t>
+            <t t-set="eta_min" t-value="product.delivery_eta_min or 35"/>
+            <t t-set="eta_max" t-value="product.delivery_eta_max or 50"/>
+            <t t-set="portion_label" t-value="product.delivery_portion_label or '1+ persona'"/>
+            <t t-set="payment_coverage_note" t-value="product.delivery_payment_coverage_note or 'Segun direccion en checkout'"/>
+            <div id="o_food_key_info" class="row g-2 mb-3">
+                <div class="col-12 col-md-4">
+                    <div class="h-100 rounded-3 border bg-white px-3 py-2">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="text-primary"><i class="fa fa-clock-o"/></span>
+                            <span class="small fw-semibold text-dark">Entrega estimada</span>
+                        </div>
+                        <p class="h6 mb-0 text-primary"><t t-out="eta_min"/>-<t t-out="eta_max"/> min</p>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="h-100 rounded-3 border bg-white px-3 py-2">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="text-success"><i class="fa fa-cutlery"/></span>
+                            <span class="small fw-semibold text-dark">Tamano / porcion</span>
+                        </div>
+                        <p class="h6 mb-0 text-success" t-out="portion_label"/>
+                    </div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <div class="h-100 rounded-3 border bg-white px-3 py-2">
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="text-info"><i class="fa fa-credit-card"/></span>
+                            <span class="small fw-semibold text-dark">Pagos y cobertura</span>
+                        </div>
+                        <p class="small mb-0 text-muted" t-out="payment_coverage_note"/>
+                    </div>
+                </div>
+            </div>
+            <div id="o_food_more_info" class="accordion accordion-flush border rounded-3 mb-3">
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="o_food_info_heading_ingredients">
+                        <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#o_food_info_ingredients" aria-expanded="false" aria-controls="o_food_info_ingredients">
+                            <i class="fa fa-list-alt me-2"/>Ingredientes y alergenos
+                        </button>
+                    </h2>
+                    <div id="o_food_info_ingredients" class="accordion-collapse collapse" aria-labelledby="o_food_info_heading_ingredients" data-bs-parent="#o_food_more_info">
+                        <div class="accordion-body small text-muted">
+                            <t t-if="product.delivery_ingredients or product.delivery_allergens">
+                                <p class="mb-2" t-if="product.delivery_ingredients"><strong>Ingredientes:</strong> <span t-out="product.delivery_ingredients"/></p>
+                                <p class="mb-0" t-if="product.delivery_allergens"><strong>Alergenos:</strong> <span t-out="product.delivery_allergens"/></p>
+                            </t>
+                            <t t-else="">
+                                <p class="mb-2">Consulta la composicion del plato antes de pedir. Si tienes una alergia, indicala en las notas del pedido para que cocina lo revise.</p>
+                                <p class="mb-0"><strong>Nota:</strong> La informacion puede variar segun disponibilidad de insumos del dia.</p>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="o_food_info_heading_incidents">
+                        <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#o_food_info_incidents" aria-expanded="false" aria-controls="o_food_info_incidents">
+                            <i class="fa fa-life-ring me-2"/>Incidencias del pedido
+                        </button>
+                    </h2>
+                    <div id="o_food_info_incidents" class="accordion-collapse collapse" aria-labelledby="o_food_info_heading_incidents" data-bs-parent="#o_food_more_info">
+                        <div class="accordion-body small text-muted">
+                            <t t-if="product.delivery_incidents_policy">
+                                <p class="mb-0" t-out="product.delivery_incidents_policy"/>
+                            </t>
+                            <t t-else="">
+                                <p class="mb-2">Si tu pedido llega incompleto o con un problema, reportalo de inmediato con tu numero de pedido.</p>
+                                <p class="mb-0">El equipo valida el caso y aplica la solucion correspondiente (reposicion, ajuste o compensacion).</p>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+
+        <xpath expr="//div[@id='product_full_description']" position="attributes">
+            <attribute name="class" add="d-none" separator=" "/>
+        </xpath>
+    </template>
+</odoo>

@@ -39,7 +39,7 @@
         <record id="group_restaurant_administrador" model="res.groups">
             <field name="name">Administrador Restaurante</field>
             <field name="category_id" ref="module_category_restaurant_casa_vieja"/>
-            <field name="implied_ids" eval="[(4, ref('base.group_user')), (4, ref('group_restaurant_administracion')), (4, ref('group_restaurant_cocinero')), (4, ref('group_restaurant_repartidor'))]"/>
+            <field name="implied_ids" eval="[(6, 0, [ref('base.group_user'), ref('group_restaurant_administracion'), ref('group_restaurant_cocinero')])]"/>
             <field name="comment">Rol con control total (CRUD) sobre los modelos del módulo.</field>
         </record>
 

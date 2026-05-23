@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="sale.portal_my_home_sale" model="ir.ui.view">
+        <field name="active" eval="False"/>
+    </record>
+
+    <template id="portal_my_home_menu_delivery" name="Portal breadcrumbs delivery" inherit_id="portal.portal_breadcrumbs" priority="35">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name == 'delivery_order'" t-attf-class="breadcrumb-item #{'active ' if not delivery_order else ''}">
+                <a t-if="delivery_order" t-attf-href="/my/delivery?{{ keep_query() }}">Mis pedidos delivery</a>
+                <t t-else="">Mis pedidos delivery</t>
+            </li>
+            <li t-if="delivery_order" class="breadcrumb-item active">
+                <t t-out="delivery_order.name"/>
+            </li>
+        </xpath>
+    </template>
+
+    <template id="portal_my_home_delivery" name="Portal card delivery" inherit_id="portal.portal_my_home" priority="35" customize_show="True">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="icon" t-value="'/sale/static/src/img/bag.svg'"/>
+                <t t-set="title">Mis pedidos delivery</t>
+                <t t-set="url" t-value="'/my/delivery'"/>
+                <t t-set="text">Sigue tu pedido, facturas y soporte en un solo flujo</t>
+                <t t-set="placeholder_count" t-value="'delivery_order_count'"/>
+            </t>
+        </div>
+    </template>
+
+    <template id="portal_my_delivery_orders" name="Portal - Mis pedidos delivery">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Mis pedidos delivery</t>
+            </t>
+
+            <div t-if="not delivery_orders" class="alert alert-warning" role="alert">
+                Aun no tienes pedidos delivery registrados.
+            </div>
+
+            <div t-if="delivery_orders" class="row g-3">
+                <t t-foreach="delivery_orders" t-as="order_data">
+                    <t t-set="order" t-value="order_data.get('record')"/>
+                    <div class="col-12 col-xl-6">
+                        <a t-att-href="order.get_portal_url()" class="text-decoration-none">
+                            <article class="rcv-delivery-card card border-0 shadow-sm h-100">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <h5 class="mb-1 text-dark" t-out="order.name"/>
+                                            <p class="mb-0 text-muted small">
+                                                <i class="fa fa-calendar me-1" title="Fecha"/> <span t-field="order.order_datetime" t-options="{'widget': 'datetime'}"/>
+                                            </p>
+                                        </div>
+                                        <span t-attf-class="badge rounded-pill text-bg-#{order_data.get('state_class')}">
+                                            <t t-out="order_data.get('state_label')"/>
+                                        </span>
+                                    </div>
+
+                                    <div class="row g-2 mt-2">
+                                        <div class="col-12 col-md-6">
+                                            <div class="rcv-pill rcv-pill-eta">
+                                                <i class="fa fa-clock-o" title="Tiempo estimado"/> ETA <strong class="ms-1"><t t-out="order.eta_minutes"/> min</strong>
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-6">
+                                            <div class="rcv-pill rcv-pill-total">
+                                                <i class="fa fa-money" title="Total"/> Total <strong class="ms-1"><span t-field="order.amount_total"/></strong>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="rcv-address mt-3">
+                                        <span class="text-muted small d-block mb-1">
+                                            <i class="fa fa-map-marker me-1" title="Direccion"/> Entrega
+                                        </span>
+                                        <p class="mb-0 text-dark" t-out="order.delivery_address"/>
+                                    </div>
+
+                                    <div class="d-flex flex-wrap gap-2 mt-3">
+                                        <span class="badge text-bg-light border">
+                                            Facturas: <t t-out="order.invoice_count"/>
+                                        </span>
+                                        <span class="badge text-bg-light border">
+                                            Pendientes: <t t-out="order_data.get('invoice_unpaid_count')"/>
+                                        </span>
+                                        <span class="badge text-bg-light border">
+                                            Incidencias: <t t-out="order.incident_count"/>
+                                        </span>
+                                    </div>
+                                </div>
+                            </article>
+                        </a>
+                    </div>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_delivery_order_page" name="Portal - Detalle pedido delivery">
+        <t t-call="portal.portal_layout">
+            <t t-set="order" t-value="delivery_order_data.get('record')"/>
+            <section class="rcv-delivery-detail">
+                <header class="card border-0 shadow-sm rcv-detail-hero">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                            <div>
+                                <h3 class="mb-1 text-dark">
+                                    Pedido <span t-out="order.name"/>
+                                </h3>
+                                <p class="mb-0 text-muted">
+                                    <i class="fa fa-calendar me-1" title="Fecha"/> <span t-field="order.order_datetime" t-options="{'widget': 'datetime'}"/>
+                                </p>
+                            </div>
+                            <span t-attf-class="badge rounded-pill text-bg-#{delivery_order_data.get('state_class')} fs-6 px-3 py-2">
+                                <t t-out="delivery_order_data.get('state_label')"/>
+                            </span>
+                        </div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-12 col-md-4">
+                                <div class="rcv-kpi">
+                                    <small>ETA estimado</small>
+                                    <strong><t t-out="order.eta_minutes"/> min</strong>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <div class="rcv-kpi">
+                                    <small>Total del pedido</small>
+                                    <strong><span t-field="order.amount_total"/></strong>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <div class="rcv-kpi">
+                                    <small>Saldo de facturas</small>
+                                    <strong><span t-field="order.invoice_residual_amount"/></strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-12 col-lg-8">
+                        <article class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h5 class="mb-3">Seguimiento del pedido</h5>
+                                <ol class="rcv-progress list-unstyled mb-0">
+                                    <t t-foreach="delivery_order_data.get('progress_steps')" t-as="step">
+                                        <li t-attf-class="rcv-progress-item #{'is-done' if step.get('done') else ''} #{'is-current' if step.get('current') else ''}">
+                                            <span class="rcv-progress-dot"/>
+                                            <span class="rcv-progress-label" t-out="step.get('label')"/>
+                                        </li>
+                                    </t>
+                                </ol>
+                            </div>
+                        </article>
+
+                        <article class="card border-0 shadow-sm mt-3">
+                            <div class="card-body">
+                                <h5 class="mb-3">Entrega y contacto</h5>
+                                <div class="row g-2">
+                                    <div class="col-12">
+                                        <div class="rcv-info-block">
+                                            <small>Direccion de entrega</small>
+                                            <p class="mb-0" t-out="order.delivery_address"/>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <div class="rcv-info-block">
+                                            <small>Cliente</small>
+                                            <p class="mb-0" t-out="order.customer_name"/>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6">
+                                        <div class="rcv-info-block">
+                                            <small>Telefono</small>
+                                            <p class="mb-0" t-out="order.customer_phone or 'Sin telefono registrado'"/>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="card border-0 shadow-sm mt-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Facturas vinculadas</h5>
+                                    <span class="badge text-bg-light border">Total: <t t-out="order.invoice_count"/></span>
+                                </div>
+                                <div t-if="not order.linked_invoice_ids" class="alert alert-light border mb-0">
+                                    Aun no hay facturas vinculadas a este pedido.
+                                </div>
+                                <div t-if="order.linked_invoice_ids" class="table-responsive">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Factura</th>
+                                                <th>Fecha</th>
+                                                <th>Estado</th>
+                                                <th class="text-end">Total</th>
+                                                <th class="text-end">Saldo</th>
+                                                <th class="text-end">Accion</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <t t-foreach="invoice_rows" t-as="inv">
+                                                <tr>
+                                                    <td><span t-out="inv.name"/></td>
+                                                    <td><span t-field="inv.invoice_date"/></td>
+                                                    <td>
+                                                        <span t-attf-class="badge rounded-pill text-bg-#{'success' if inv.payment_state in ['paid', 'reversed'] else 'warning'}">
+                                                            <t t-out="inv.payment_state"/>
+                                                        </span>
+                                                    </td>
+                                                    <td class="text-end"><span t-field="inv.amount_total"/></td>
+                                                    <td class="text-end"><span t-field="inv.amount_residual"/></td>
+                                                    <td class="text-end">
+                                                        <a t-att-href="inv.get_portal_url()" class="btn btn-outline-dark btn-sm">Ver</a>
+                                                    </td>
+                                                </tr>
+                                            </t>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="col-12 col-lg-4" id="delivery-incidents">
+                        <article class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h5 class="mb-3">Reportar incidencia</h5>
+                                <div t-if="incident_submitted" class="alert alert-success py-2">
+                                    Tu incidencia fue enviada. El equipo la revisara pronto.
+                                </div>
+                                <div t-if="incident_error" class="alert alert-danger py-2">
+                                    Verifica el tipo de incidencia y agrega una descripcion mas detallada.
+                                </div>
+                                <form t-attf-action="/my/delivery/{{order.id}}/incident" method="post" class="d-flex flex-column gap-2">
+                                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                    <label class="small text-muted" for="issue_type">Tipo de incidencia</label>
+                                    <select id="issue_type" name="issue_type" class="form-select" required="required">
+                                        <option value="incomplete">Pedido incompleto</option>
+                                        <option value="cold">Producto frio</option>
+                                        <option value="delay">Demora</option>
+                                        <option value="wrong_item">Producto incorrecto</option>
+                                        <option value="other">Otro</option>
+                                    </select>
+                                    <label class="small text-muted mt-1" for="description">Descripcion</label>
+                                    <textarea id="description" name="description" rows="4" class="form-control" minlength="10" placeholder="Cuentanos que paso para ayudarte rapido..." required="required"/>
+                                    <button type="submit" class="btn btn-dark mt-2">Enviar incidencia</button>
+                                </form>
+                            </div>
+                        </article>
+
+                        <article class="card border-0 shadow-sm mt-3">
+                            <div class="card-body">
+                                <h6 class="mb-3">Historial de incidencias</h6>
+                                <div t-if="not incidents" class="text-muted small">
+                                    Sin incidencias reportadas para este pedido.
+                                </div>
+                                <ul t-if="incidents" class="list-unstyled d-flex flex-column gap-2 mb-0">
+                                    <t t-foreach="incidents" t-as="incident">
+                                        <li class="rcv-incident-item">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <strong class="small" t-out="dict(incident._fields['issue_type'].selection).get(incident.issue_type)"/>
+                                                <span class="badge text-bg-light border" t-out="incident.state"/>
+                                            </div>
+                                            <div class="small text-muted mt-1">
+                                                <span t-field="incident.reported_datetime" t-options="{'widget': 'datetime'}"/>
+                                            </div>
+                                            <p class="small mb-0 mt-1" t-out="incident.description"/>
+                                        </li>
+                                    </t>
+                                </ul>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+        </t>
+    </template>
+</odoo>
+

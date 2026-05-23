@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="product_template_form_view_delivery_web_info" model="ir.ui.view">
+        <field name="name">product.template.form.delivery.web.info</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='sales']/group/group[@name='description']" position="after">
+                <group string="Delivery Web Info">
+                    <group string="KPIs en ficha de producto">
+                        <field name="delivery_eta_min"/>
+                        <field name="delivery_eta_max"/>
+                        <field name="delivery_portion_label"/>
+                        <field name="delivery_payment_coverage_note"/>
+                    </group>
+                    <group string="Desplegables en ficha de producto">
+                        <field name="delivery_ingredients" placeholder="Ej: Pan artesanal, carne de res, queso cheddar, cebolla caramelizada..."/>
+                        <field name="delivery_allergens" placeholder="Ej: Contiene gluten y lacteos. Puede contener trazas de frutos secos."/>
+                        <field name="delivery_incidents_policy" placeholder="Ej: Reporta cualquier inconveniente con tu numero de pedido y te ayudamos de inmediato."/>
+                    </group>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -4,6 +4,7 @@
         id="menu_restaurant_delivery_root"
         name="Delivery"
         parent="restaurant_casa_vieja_base.menu_restaurant_casa_vieja_root"
+        groups="restaurant_casa_vieja_base.group_restaurant_repartidor,restaurant_casa_vieja_base.group_restaurant_cocinero,restaurant_casa_vieja_base.group_restaurant_mesero,restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
         sequence="20"/>
 
     <menuitem
@@ -11,5 +12,22 @@
         name="Pedidos"
         parent="menu_restaurant_delivery_root"
         action="action_restaurant_delivery_orders"
+        groups="restaurant_casa_vieja_base.group_restaurant_cocinero,restaurant_casa_vieja_base.group_restaurant_mesero,restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
         sequence="10"/>
+
+    <menuitem
+        id="menu_restaurant_delivery_incidents"
+        name="Incidencias"
+        parent="menu_restaurant_delivery_root"
+        action="action_restaurant_delivery_incidents"
+        groups="restaurant_casa_vieja_base.group_restaurant_cocinero,restaurant_casa_vieja_base.group_restaurant_mesero,restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
+        sequence="20"/>
+
+    <menuitem
+        id="menu_restaurant_delivery_my_orders"
+        name="Mis pedidos"
+        parent="menu_restaurant_delivery_root"
+        action="action_restaurant_delivery_orders_driver"
+        groups="restaurant_casa_vieja_base.group_restaurant_repartidor"
+        sequence="30"/>
 </odoo>
