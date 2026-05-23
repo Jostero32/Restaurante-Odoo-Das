@@ -16,6 +16,12 @@ class RestaurantDeliveryOrder(models.Model):
         tracking=True,
     )
     customer_name = fields.Char(string="Cliente", required=True, tracking=True)
+    partner_id = fields.Many2one(
+        "res.partner",
+        string="Cliente (partner)",
+        help="Enlace opcional al contacto del cliente (res.partner)",
+        tracking=True,
+    )
     customer_phone = fields.Char(string="Telefono", tracking=True)
     delivery_address = fields.Char(string="Direccion de entrega", required=True, tracking=True)
     order_datetime = fields.Datetime(
