@@ -8,15 +8,24 @@
     "depends": [
         "base",
         "mail",
+        "website",
         "restaurant_casa_vieja_base",
     ],
     "data": [
         "security/ir.model.access.csv",
         "views/restaurant_table_views.xml",
         "views/table_reservation_views.xml",
+        "views/reservation_website_templates.xml",
         "views/menu.xml",
     ],
+    "assets": {
+        "web.assets_frontend": [
+            "restaurant_table_reservations/static/src/css/reservation.css",
+            "restaurant_table_reservations/static/src/js/reservation.js",
+        ],
+    },
     "installable": True,
     "application": False,
     "auto_install": False,
+    "post_init_hook": "post_init_hook",
 }

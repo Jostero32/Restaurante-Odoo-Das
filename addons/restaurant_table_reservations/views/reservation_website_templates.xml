@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="reservation_page" name="Reservar mesa">
+        <t t-call="website.layout">
+            <t t-set="title">Reservar mesa</t>
+            <div id="wrap" class="o_reservation_page">
+                <section class="o_reservation_hero">
+                    <div class="container">
+                        <p class="o_reservation_kicker">Restaurante Casa Vieja</p>
+                        <h1>Reserva tu mesa en tiempo real</h1>
+                        <p>
+                               Elige si prefieres salón principal, patio o zona privada. La reserva
+                            bloquea la mesa por 1 hora y 15 minutos, incluyendo margen de salida.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="container o_reservation_content">
+                    <t t-if="success_message">
+                        <div class="alert alert-success" role="alert"><t t-esc="success_message"/></div>
+                    </t>
+                    <t t-if="error_message">
+                        <div class="alert alert-danger" role="alert"><t t-esc="error_message"/></div>
+                    </t>
+
+                    <div class="row g-4">
+                        <div class="col-lg-7">
+                            <form action="/reservas/create" method="post" class="o_reservation_form" id="reservation_form">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <input type="hidden" name="table_id" id="table_id" t-att-value="selected_table_id or ''"/>
+
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="customer_name">Nombre *</label>
+                                        <input id="customer_name" name="customer_name" class="form-control" required="required" t-att-value="customer_name"/>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="customer_phone">Teléfono</label>
+                                        <input id="customer_phone" name="customer_phone" class="form-control" t-att-value="customer_phone"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="party_size">Personas *</label>
+                                        <input id="party_size" name="party_size" type="number" min="1" class="form-control" required="required" t-att-value="selected_party_size"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="date">Fecha *</label>
+                                        <input id="date" name="date" type="date" class="form-control" required="required" t-att-value="selected_date"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="time">Hora *</label>
+                                        <input id="time" name="time" type="time" class="form-control" required="required" t-att-value="selected_time" step="900"/>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="zone">Zona preferida *</label>
+                                            <select id="zone" name="zone" class="form-select" required="required">
+                                                <option value="main" t-att-selected="selected_zone == 'main' and 'selected' or None">Interior</option>
+                                                <option value="patio" t-att-selected="selected_zone == 'patio' and 'selected' or None">Patio</option>
+                                                <option value="private" t-att-selected="selected_zone == 'private' and 'selected' or None">Privado</option>
+                                            </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Mesa disponible *</label>
+                                        <div id="table_results" class="o_table_results"></div>
+                                        <small class="text-muted d-block mt-2">
+                                            Cuando cambies fecha, hora, personas o zona, las mesas se actualizan automáticamente.
+                                        </small>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="notes">Notas</label>
+                                        <textarea id="notes" name="notes" class="form-control" rows="4"><t t-esc="notes"/></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 d-flex flex-wrap gap-3 align-items-center">
+                                    <button type="submit" class="btn btn-primary btn-lg">Reservar ahora</button>
+                                    <div class="o_reservation_summary" id="reservation_summary">
+                                        <span>Duración de mesa: 1 hora + 15 minutos de margen.</span>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="col-lg-5">
+                            <aside class="o_reservation_sidebar">
+                                <h2>Mesas y zonas</h2>
+                                <p>Interior, exterior y áreas privadas se muestran por separado para que elijas la experiencia que buscas.</p>
+                                <div class="o_sidebar_card">
+                                    <strong>Disponible en vivo</strong>
+                                    <p id="availability_feedback">Selecciona fecha, hora y zona para ver mesas.</p>
+                                    <p id="reservation_window_feedback" class="text-muted mb-0"></p>
+                                </div>
+                            </aside>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </t>
+    </template>
+
+    <record id="website_menu_reservas_restaurante" model="website.menu">
+        <field name="name">Reservas</field>
+        <field name="url">/reservas</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" eval="45"/>
+    </record>
+</odoo>

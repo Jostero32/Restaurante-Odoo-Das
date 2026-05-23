@@ -5,14 +5,14 @@ from odoo.exceptions import ValidationError
 class RestaurantTable(models.Model):
     _name = "restaurant.table"
     _description = "Mesa del restaurante"
-    _order = "name"
+    _order = "zone, id"
 
     name = fields.Char(string="Mesa", required=True)
     capacity = fields.Integer(string="Capacidad", required=True, default=4)
     zone = fields.Selection(
         [
-            ("main", "Salon principal"),
-            ("terrace", "Terraza"),
+            ("main", "Interior"),
+            ("patio", "Patio"),
             ("private", "Privado"),
         ],
         string="Zona",

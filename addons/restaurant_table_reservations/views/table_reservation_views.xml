@@ -9,6 +9,7 @@
                 <field name="customer_name"/>
                 <field name="customer_phone"/>
                 <field name="party_size"/>
+                <field name="zone"/>
                 <field name="table_id"/>
                 <field name="start_datetime"/>
                 <field name="end_datetime"/>
@@ -36,11 +37,12 @@
                             <field name="customer_name"/>
                             <field name="customer_phone"/>
                             <field name="party_size"/>
+                            <field name="zone"/>
                         </group>
                         <group>
-                            <field name="table_id"/>
+                            <field name="table_id" domain="[('active', '=', True), ('zone', '=', zone)]"/>
                             <field name="start_datetime"/>
-                            <field name="end_datetime"/>
+                            <field name="end_datetime" readonly="1"/>
                         </group>
                     </group>
                     <notebook>
