@@ -61,5 +61,215 @@
         <field name="res_model">restaurant.delivery.order</field>
         <field name="view_mode">list,form</field>
         <field name="context">{'default_state': 'draft'}</field>
+        <field name="groups_id" eval="[(6, 0, [ref('restaurant_casa_vieja_base.group_restaurant_mesero'), ref('restaurant_casa_vieja_base.group_restaurant_administracion'), ref('restaurant_casa_vieja_base.group_restaurant_administrador')])]"/>
+    </record>
+
+    <record id="view_restaurant_delivery_order_search_driver" model="ir.ui.view">
+        <field name="name">restaurant.delivery.order.search.driver</field>
+        <field name="model">restaurant.delivery.order</field>
+        <field name="arch" type="xml">
+            <search string="Mis pedidos delivery">
+                <field name="name"/>
+                <field name="customer_name"/>
+                <field name="customer_phone"/>
+                <field name="delivery_address"/>
+                <field name="state"/>
+                <separator/>
+                <filter name="pending_orders" string="Pendientes" domain="[('state', 'in', ['assigned', 'on_route'])]"/>
+                <filter name="assigned_orders" string="Por salir" domain="[('state', '=', 'assigned')]"/>
+                <filter name="on_route_orders" string="En ruta" domain="[('state', '=', 'on_route')]"/>
+                <filter name="delivered_orders" string="Entregados" domain="[('state', '=', 'delivered')]"/>
+                <separator/>
+                <filter name="group_by_state" string="Agrupar por estado" context="{'group_by': 'state'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="view_restaurant_delivery_order_kanban_driver" model="ir.ui.view">
+        <field name="name">restaurant.delivery.order.kanban.driver</field>
+        <field name="model">restaurant.delivery.order</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_small_column" create="false" quick_create="false" default_group_by="state">
+                <field name="name"/>
+                <field name="customer_name"/>
+                <field name="customer_phone"/>
+                <field name="delivery_address"/>
+                <field name="order_datetime"/>
+                <field name="eta_minutes"/>
+                <field name="amount_total"/>
+                <field name="currency_id"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <main class="d-flex flex-column gap-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="fw-bold fs-5">
+                                        <field name="name"/>
+                                    </div>
+                                    <div class="text-muted small">
+                                        <i class="fa fa-user me-1" title="Cliente"/> <field name="customer_name"/>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span t-if="record.state.raw_value == 'assigned'" class="badge text-bg-info">Por salir</span>
+                                    <span t-if="record.state.raw_value == 'on_route'" class="badge text-bg-warning">En ruta</span>
+                                    <span t-if="record.state.raw_value == 'delivered'" class="badge text-bg-success">Entregado</span>
+                                    <span t-if="record.state.raw_value == 'cancelled'" class="badge text-bg-secondary">Cancelado</span>
+                                    <span t-if="record.state.raw_value not in ['assigned', 'on_route', 'delivered', 'cancelled']" class="badge text-bg-light">Pendiente</span>
+                                </div>
+                            </div>
+                            <div class="rounded-3 border p-2 bg-light-subtle">
+                                <div class="small text-muted mb-1"><i class="fa fa-map-marker me-1" title="Direccion"/>Direccion</div>
+                                <div class="fw-semibold"><field name="delivery_address"/></div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <div class="rounded-3 px-2 py-1 bg-primary-subtle text-primary-emphasis small">
+                                    <i class="fa fa-clock-o me-1" title="Tiempo estimado"/> ETA <field name="eta_minutes"/> min
+                                </div>
+                                <div class="rounded-3 px-2 py-1 bg-success-subtle text-success-emphasis small">
+                                    <i class="fa fa-money me-1" title="Total del pedido"/> <field name="amount_total"/> <field name="currency_id"/>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <a t-if="record.customer_phone.raw_value" t-att-href="'tel:%s' % record.customer_phone.raw_value" class="btn btn-outline-secondary btn-sm" role="button">
+                                    <i class="fa fa-phone me-1" title="Llamar al cliente"/>Llamar
+                                </a>
+                                <button name="action_on_route" type="object" class="btn btn-primary btn-sm" t-if="record.state.raw_value == 'assigned'">
+                                    <i class="fa fa-motorcycle me-1" title="Iniciar ruta"/>Iniciar ruta
+                                </button>
+                                <button name="action_delivered" type="object" class="btn btn-success btn-sm" t-if="record.state.raw_value == 'on_route'">
+                                    <i class="fa fa-check me-1" title="Marcar entregado"/>Marcar entregado
+                                </button>
+                            </div>
+                        </main>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_restaurant_delivery_order_list_driver" model="ir.ui.view">
+        <field name="name">restaurant.delivery.order.list.driver</field>
+        <field name="model">restaurant.delivery.order</field>
+        <field name="arch" type="xml">
+            <list string="Mis pedidos" create="false" delete="false"
+                  decoration-info="state == 'assigned'"
+                  decoration-warning="state == 'on_route'"
+                  decoration-success="state == 'delivered'">
+                <field name="name"/>
+                <field name="customer_name"/>
+                <field name="customer_phone"/>
+                <field name="delivery_address"/>
+                <field name="eta_minutes"/>
+                <field name="amount_total"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_restaurant_delivery_order_form_driver" model="ir.ui.view">
+        <field name="name">restaurant.delivery.order.form.driver</field>
+        <field name="model">restaurant.delivery.order</field>
+        <field name="arch" type="xml">
+            <form string="Mi pedido delivery" create="false" delete="false">
+                <header>
+                    <button name="action_on_route" string="Iniciar ruta" type="object" class="btn-primary" invisible="state != 'assigned'"/>
+                    <button name="action_delivered" string="Marcar entregado" type="object" class="btn-success" invisible="state != 'on_route'"/>
+                    <field name="state" widget="statusbar" statusbar_visible="assigned,on_route,delivered,cancelled"/>
+                </header>
+                <sheet>
+                    <div class="row g-2 mb-3">
+                        <div class="col-12 col-lg-4">
+                            <div class="h-100 rounded-3 border border-primary-subtle bg-primary-subtle p-3">
+                                <div class="small text-uppercase text-primary-emphasis fw-semibold mb-1">
+                                    <i class="fa fa-user me-1" title="Cliente"/>Cliente
+                                </div>
+                                <div class="fw-bold fs-5">
+                                    <field name="customer_name" readonly="1"/>
+                                </div>
+                                <div class="text-muted small">
+                                    <i class="fa fa-phone me-1" title="Telefono"/><field name="customer_phone" readonly="1"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-4">
+                            <div class="h-100 rounded-3 border border-warning-subtle bg-warning-subtle p-3">
+                                <div class="small text-uppercase text-warning-emphasis fw-semibold mb-1">
+                                    <i class="fa fa-clock-o me-1" title="Tiempo estimado"/>Tiempo
+                                </div>
+                                <div class="fw-bold fs-4">
+                                    <field name="eta_minutes" readonly="1"/> min
+                                </div>
+                                <div class="text-muted small">
+                                    <i class="fa fa-calendar me-1" title="Fecha del pedido"/><field name="order_datetime" readonly="1"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-4">
+                            <div class="h-100 rounded-3 border border-success-subtle bg-success-subtle p-3">
+                                <div class="small text-uppercase text-success-emphasis fw-semibold mb-1">
+                                    <i class="fa fa-money me-1" title="Total del pedido"/>Total
+                                </div>
+                                <div class="fw-bold fs-4">
+                                    <field name="amount_total" readonly="1"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <group col="2">
+                        <group>
+                            <field name="name" readonly="1"/>
+                            <field name="customer_name" readonly="1"/>
+                            <field name="customer_phone" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="driver_id" readonly="1"/>
+                            <field name="eta_minutes" readonly="1"/>
+                            <field name="currency_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Entrega">
+                        <field name="delivery_address" readonly="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Notas operativas">
+                            <field name="notes" placeholder="Ejemplo: Cliente confirma pago contraentrega, acceso por porteria, etc."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_restaurant_delivery_orders_driver" model="ir.actions.act_window">
+        <field name="name">Mis pedidos</field>
+        <field name="res_model">restaurant.delivery.order</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="domain">[('driver_id', '=', uid)]</field>
+        <field name="search_view_id" ref="view_restaurant_delivery_order_search_driver"/>
+        <field name="context">{'search_default_pending_orders': 1, 'create': False}</field>
+        <field name="groups_id" eval="[(6, 0, [ref('restaurant_casa_vieja_base.group_restaurant_repartidor')])]"/>
+    </record>
+
+    <record id="action_restaurant_delivery_orders_driver_view_kanban" model="ir.actions.act_window.view">
+        <field name="sequence" eval="1"/>
+        <field name="view_mode">kanban</field>
+        <field name="view_id" ref="view_restaurant_delivery_order_kanban_driver"/>
+        <field name="act_window_id" ref="action_restaurant_delivery_orders_driver"/>
+    </record>
+
+    <record id="action_restaurant_delivery_orders_driver_view_list" model="ir.actions.act_window.view">
+        <field name="sequence" eval="2"/>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_restaurant_delivery_order_list_driver"/>
+        <field name="act_window_id" ref="action_restaurant_delivery_orders_driver"/>
+    </record>
+
+    <record id="action_restaurant_delivery_orders_driver_view_form" model="ir.actions.act_window.view">
+        <field name="sequence" eval="3"/>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_restaurant_delivery_order_form_driver"/>
+        <field name="act_window_id" ref="action_restaurant_delivery_orders_driver"/>
     </record>
 </odoo>

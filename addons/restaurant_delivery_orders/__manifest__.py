@@ -15,6 +15,7 @@
         "data/delivery_sequence.xml",
         "data/website_cleanup.xml",
         "security/ir.model.access.csv",
+        "security/ir_rule.xml",
         "views/delivery_order_views.xml",
         "views/product_template_views.xml",
         "views/website_sale_templates.xml",

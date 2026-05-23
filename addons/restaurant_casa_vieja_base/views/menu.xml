@@ -4,5 +4,6 @@
         id="menu_restaurant_casa_vieja_root"
         name="Restaurante Casa Vieja"
         sequence="10"
+        groups="restaurant_casa_vieja_base.group_restaurant_repartidor,restaurant_casa_vieja_base.group_restaurant_mesero,restaurant_casa_vieja_base.group_restaurant_cocinero,restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
         web_icon="restaurant_casa_vieja_base,static/description/icon.png"/>
 </odoo>

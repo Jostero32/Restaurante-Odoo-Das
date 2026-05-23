@@ -1,5 +1,5 @@
 from odoo import _, api, fields, models
-from odoo.exceptions import UserError, ValidationError
+from odoo.exceptions import AccessError, UserError, ValidationError
 
 
 class RestaurantDeliveryOrder(models.Model):
@@ -38,7 +38,6 @@ class RestaurantDeliveryOrder(models.Model):
         default=lambda self: self.env.company.currency_id,
         required=True,
     )
-    driver_id = fields.Many2one("res.users", string="Repartidor", tracking=True)
     notes = fields.Text(string="Notas")
     state = fields.Selection(
         [
@@ -55,12 +54,56 @@ class RestaurantDeliveryOrder(models.Model):
         tracking=True,
     )
 
+    @api.model
+    def _driver_domain(self):
+        repartidor_group = self.env.ref("restaurant_casa_vieja_base.group_restaurant_repartidor", raise_if_not_found=False)
+        administrador_group = self.env.ref("restaurant_casa_vieja_base.group_restaurant_administrador", raise_if_not_found=False)
+        domain = [("share", "=", False)]
+        if repartidor_group:
+            domain.append(("groups_id", "in", [repartidor_group.id]))
+        if administrador_group:
+            domain.append(("groups_id", "not in", [administrador_group.id]))
+        return domain
+
+    driver_id = fields.Many2one(
+        "res.users",
+        string="Repartidor",
+        tracking=True,
+        domain=lambda self: self._driver_domain(),
+    )
+
+    @api.model
+    def _is_repartidor_only_user(self):
+        user = self.env.user
+        return (
+            user.has_group("restaurant_casa_vieja_base.group_restaurant_repartidor")
+            and not user.has_group("restaurant_casa_vieja_base.group_restaurant_administracion")
+            and not user.has_group("restaurant_casa_vieja_base.group_restaurant_administrador")
+        )
+
     @api.model_create_multi
     def create(self, vals_list):
+        if self._is_repartidor_only_user():
+            raise AccessError(_("No tiene permisos para crear pedidos delivery."))
         for vals in vals_list:
             if not vals.get("name") or vals["name"] == _("Nuevo pedido"):
                 vals["name"] = self.env["ir.sequence"].next_by_code("restaurant.delivery.order") or _("Nuevo pedido")
         return super().create(vals_list)
+
+    def write(self, vals):
+        if self._is_repartidor_only_user():
+            allowed_fields = {"state", "notes"}
+            forbidden_fields = set(vals) - allowed_fields
+            if forbidden_fields:
+                raise AccessError(_("Como repartidor solo puede actualizar el estado y notas operativas del pedido."))
+            if "state" in vals and vals["state"] not in {"on_route", "delivered"}:
+                raise AccessError(_("Como repartidor solo puede cambiar el estado a En ruta o Entregado."))
+        return super().write(vals)
+
+    def unlink(self):
+        if self._is_repartidor_only_user():
+            raise AccessError(_("No tiene permisos para eliminar pedidos delivery."))
+        return super().unlink()
 
     @api.model
     def _disable_ecommerce_terms_block(self):
@@ -84,8 +127,78 @@ class RestaurantDeliveryOrder(models.Model):
             """
             UPDATE restaurant_delivery_order
                SET customer_name = 'Cliente no especificado'
-             WHERE customer_name IS NULL OR btrim(customer_name) = ''
+            WHERE customer_name IS NULL OR btrim(customer_name) = ''
             """
+        )
+
+    @api.model
+    def _cleanup_admin_repartidor_membership(self):
+        admin_group = self.env.ref("restaurant_casa_vieja_base.group_restaurant_administrador", raise_if_not_found=False)
+        repartidor_group = self.env.ref("restaurant_casa_vieja_base.group_restaurant_repartidor", raise_if_not_found=False)
+        if not admin_group or not repartidor_group:
+            return
+        users_in_both = admin_group.users & repartidor_group.users
+        if users_in_both:
+            users_in_both.write({"groups_id": [(3, repartidor_group.id)]})
+
+    @api.model
+    def _update_menu_groups(self, menu_xmlid, add_group_xmlids=None, remove_group_xmlids=None, replace_group_xmlids=None):
+        menu = self.env.ref(menu_xmlid, raise_if_not_found=False)
+        if not menu:
+            return
+
+        if replace_group_xmlids is not None:
+            group_ids = []
+            for group_xmlid in replace_group_xmlids:
+                group = self.env.ref(group_xmlid, raise_if_not_found=False)
+                if group:
+                    group_ids.append(group.id)
+            menu.write({"groups_id": [(6, 0, group_ids)]})
+            return
+
+        commands = []
+        for group_xmlid in remove_group_xmlids or []:
+            group = self.env.ref(group_xmlid, raise_if_not_found=False)
+            if group and group in menu.groups_id:
+                commands.append((3, group.id))
+        for group_xmlid in add_group_xmlids or []:
+            group = self.env.ref(group_xmlid, raise_if_not_found=False)
+            if group and group not in menu.groups_id:
+                commands.append((4, group.id))
+        if commands:
+            menu.write({"groups_id": commands})
+
+    @api.model
+    def _lockdown_repartidor_backend_menus(self):
+        # Repartidor mantiene acceso al backend, pero solo debe operar su flujo de delivery.
+        allowed_non_driver_groups = [
+            "restaurant_casa_vieja_base.group_restaurant_mesero",
+            "restaurant_casa_vieja_base.group_restaurant_administracion",
+            "restaurant_casa_vieja_base.group_restaurant_administrador",
+        ]
+        menus_bound_to_internal_user = [
+            "mail.menu_root_discuss",
+            "calendar.mail_menu_calendar",
+            "contacts.menu_contacts",
+            "website.menu_website_configuration",
+        ]
+        for menu_xmlid in menus_bound_to_internal_user:
+            self._update_menu_groups(
+                menu_xmlid,
+                add_group_xmlids=allowed_non_driver_groups,
+                remove_group_xmlids=["base.group_user"],
+            )
+
+        # Menu de tableros suele venir sin grupos: se fuerza a roles no repartidor.
+        self._update_menu_groups(
+            "spreadsheet_dashboard.spreadsheet_dashboard_menu_root",
+            replace_group_xmlids=allowed_non_driver_groups,
+        )
+
+        # Nodo secundario de website que puede quedar visible si existe.
+        self._update_menu_groups(
+            "website.menu_site",
+            replace_group_xmlids=allowed_non_driver_groups,
         )
 
     @api.constrains("eta_minutes")
@@ -94,13 +207,30 @@ class RestaurantDeliveryOrder(models.Model):
             if order.eta_minutes < 0:
                 raise ValidationError(_("El ETA no puede ser negativo."))
 
+    @api.constrains("driver_id")
+    def _check_driver_role(self):
+        repartidor_group = self.env.ref("restaurant_casa_vieja_base.group_restaurant_repartidor", raise_if_not_found=False)
+        administrador_group = self.env.ref("restaurant_casa_vieja_base.group_restaurant_administrador", raise_if_not_found=False)
+        for order in self:
+            driver = order.driver_id
+            if not driver:
+                continue
+            if repartidor_group and repartidor_group not in driver.groups_id:
+                raise ValidationError(_("El usuario asignado no pertenece al rol Repartidor Restaurante."))
+            if administrador_group and administrador_group in driver.groups_id:
+                raise ValidationError(_("No se puede asignar un Administrador Restaurante como repartidor."))
+
     def action_confirm(self):
+        if self._is_repartidor_only_user():
+            raise AccessError(_("No tiene permisos para confirmar pedidos."))
         invalid = self.filtered(lambda order: order.state != "draft")
         if invalid:
             raise UserError(_("Solo se pueden confirmar pedidos en borrador."))
         self.write({"state": "confirmed"})
 
     def action_assign(self):
+        if self._is_repartidor_only_user():
+            raise AccessError(_("No tiene permisos para asignar pedidos."))
         invalid = self.filtered(lambda order: order.state != "confirmed")
         if invalid:
             raise UserError(_("Solo se pueden asignar pedidos confirmados."))
@@ -125,6 +255,8 @@ class RestaurantDeliveryOrder(models.Model):
         self.write({"state": "delivered"})
 
     def action_cancel(self):
+        if self._is_repartidor_only_user():
+            raise AccessError(_("No tiene permisos para cancelar pedidos."))
         delivered = self.filtered(lambda order: order.state == "delivered")
         if delivered:
             raise UserError(_("No puede cancelar un pedido entregado."))
