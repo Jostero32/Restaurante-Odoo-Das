@@ -14,10 +14,35 @@ class RestaurantTableReservationController(http.Controller):
         except (TypeError, ValueError):
             return default
 
+    def _get_local_tz(self):
+        # 1. Check Odoo context
+        tz = request.context.get("tz")
+        if tz:
+            return tz
+        # 2. Check current user tz
+        if request.env.user and request.env.user.tz:
+            return request.env.user.tz
+        # 3. Check if any admin or partner has tz configured
+        user_with_tz = request.env["res.users"].sudo().search([("tz", "!=", False)], limit=1)
+        if user_with_tz:
+            return user_with_tz.tz
+        # 4. Fallback
+        return "America/Bogota"
+
+    def _local_to_utc(self, naive_dt):
+        if not naive_dt:
+            return None
+        import pytz
+        tz_name = self._get_local_tz()
+        local_tz = pytz.timezone(tz_name)
+        local_dt = local_tz.localize(naive_dt, is_dst=None)
+        return local_dt.astimezone(pytz.utc).replace(tzinfo=None)
+
     def _parse_start_datetime(self, date_value, time_value):
         if not date_value or not time_value:
             return None
-        return datetime.strptime(f"{date_value} {time_value}", "%Y-%m-%d %H:%M")
+        naive_dt = datetime.strptime(f"{date_value} {time_value}", "%Y-%m-%d %H:%M")
+        return self._local_to_utc(naive_dt)
 
     def _build_context(self, **kwargs):
         reservation_model = request.env["restaurant.table.reservation"].sudo()
@@ -28,9 +53,8 @@ class RestaurantTableReservationController(http.Controller):
         available_tables = []
         reservation_window_end = False
         if start_datetime:
-            reservation_window_end = fields.Datetime.to_string(
-                reservation_model._get_end_datetime(start_datetime)
-            )
+            end_datetime = reservation_model._get_end_datetime(start_datetime)
+            reservation_window_end = fields.Datetime.to_string(end_datetime) + "Z"
             available_tables = reservation_model._get_available_tables(start_datetime, party_size, zone=zone)
 
         zone_options = [
