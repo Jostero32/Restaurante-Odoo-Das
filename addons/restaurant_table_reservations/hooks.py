@@ -3,57 +3,45 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
-# Map POS floor names to reservation zones
-_FLOOR_ZONE_MAP = {
-    "interior": "main",
-    "patio": "patio",
-}
-
-# POS floor IDs that are valid for the restaurant
-_VALID_FLOOR_IDS = {7, 10}  # 7=Interior, 10=Patio
-
-
-def _sync_table_zones(env):
-    """Synchronize table zones based on the POS floor assignment.
-
-    Maps each table's zone from its floor_id name:
-      - Floors with 'interior' in the name → zone 'main'
-      - Floors with 'patio' in the name   → zone 'patio'
-      - Tables on non-valid floors         → deactivated
-    """
-    tables = env["restaurant.table"].sudo().search([], order="id asc")
-    counter = {"main": 0, "patio": 0}
-
-    for table in tables:
-        floor_id = table.floor_id.id if hasattr(table, "floor_id") and table.floor_id else None
-        floor_name = (table.floor_id.name or "").strip().lower() if hasattr(table, "floor_id") and table.floor_id else ""
-
-        # Determine zone from floor name
-        zone = None
-        for keyword, zone_code in _FLOOR_ZONE_MAP.items():
-            if keyword in floor_name:
-                zone = zone_code
-                break
-
-        # Only activate tables on valid floors with a recognized zone
-        if zone and floor_id in _VALID_FLOOR_IDS:
-            counter[zone] = counter.get(zone, 0) + 1
-            table.write({
-                "name": str(counter[zone]),
-                "zone": zone,
-                "active": True,
-            })
-        else:
-            table.write({"active": False})
-
-    _logger.info(
-        "Table zone sync complete: %s interior, %s patio, %s total active",
-        counter.get("main", 0),
-        counter.get("patio", 0),
-        sum(counter.values()),
-    )
+# POS floor names (case-insensitive) that map to valid restaurant zones.
+_VALID_FLOOR_KEYWORDS = ("interior", "patio")
 
 
 def post_init_hook(cr, registry):
+    """Deactivate tables that do not belong to a valid restaurant floor.
+
+    Valid floors are those whose name contains 'interior' or 'patio'.
+    This keeps the reservation system in sync with the POS floor plan
+    without requiring any manual DB steps.
+    """
     env = api.Environment(cr, SUPERUSER_ID, {})
-    _sync_table_zones(env)
+
+    # Find valid floor IDs by name
+    all_floors = env["restaurant.floor"].sudo().search([])
+    valid_floor_ids = set()
+    for floor in all_floors:
+        fname = (floor.name or "").strip().lower()
+        if any(kw in fname for kw in _VALID_FLOOR_KEYWORDS):
+            valid_floor_ids.add(floor.id)
+
+    _logger.info("Valid floor IDs for reservations: %s", valid_floor_ids)
+
+    # Deactivate tables on non-valid floors
+    tables = env["restaurant.table"].sudo().with_context(active_test=False).search([])
+    to_deactivate = tables.filtered(
+        lambda t: not t.floor_id or t.floor_id.id not in valid_floor_ids
+    )
+    to_activate = tables.filtered(
+        lambda t: t.floor_id and t.floor_id.id in valid_floor_ids
+    )
+
+    if to_deactivate:
+        to_deactivate.write({"active": False})
+    if to_activate:
+        to_activate.write({"active": True})
+
+    _logger.info(
+        "Table sync complete: %s active, %s deactivated",
+        len(to_activate),
+        len(to_deactivate),
+    )

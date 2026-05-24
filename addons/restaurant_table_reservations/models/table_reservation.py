@@ -45,6 +45,10 @@ class RestaurantTableReservation(models.Model):
         tracking=True,
     )
 
+    # ------------------------------------------------------------------
+    # Onchange helpers
+    # ------------------------------------------------------------------
+
     @api.onchange("start_datetime")
     def _onchange_start_datetime(self):
         for reservation in self:
@@ -55,35 +59,63 @@ class RestaurantTableReservation(models.Model):
     def _onchange_zone_party_size(self):
         for reservation in self:
             if reservation.table_id and (
-                reservation.table_id.zone != reservation.zone or reservation.table_id.capacity < reservation.party_size
+                reservation.table_id.zone != reservation.zone
+                or reservation.table_id.seats < reservation.party_size
             ):
                 reservation.table_id = False
+
+    # ------------------------------------------------------------------
+    # Business logic
+    # ------------------------------------------------------------------
 
     @api.model
     def _get_end_datetime(self, start_datetime):
         return start_datetime + timedelta(minutes=self.RESERVATION_MINUTES + self.BUFFER_MINUTES)
 
     @api.model
+    def _get_floor_ids_for_zone(self, zone):
+        """Return floor IDs that match a given zone code."""
+        floors = self.env["restaurant.floor"].sudo().search([])
+        zone_keyword = {"main": "interior", "patio": "patio"}.get(zone, "")
+        return [
+            f.id for f in floors
+            if zone_keyword and zone_keyword in (f.name or "").strip().lower()
+        ]
+
+    @api.model
     def _get_available_tables(self, start_datetime, party_size, zone=None, exclude_reservation_id=None):
+        """Return available tables as a list of dicts with uniform keys."""
         end_datetime = self._get_end_datetime(start_datetime)
+
         sql = [
-            "SELECT id, COALESCE(name, 'Mesa ' || id::text) AS name, COALESCE(capacity, 0) AS capacity, COALESCE(zone, '') AS zone, COALESCE(notes, '') AS notes",
-            "FROM restaurant_table",
-            "WHERE active IS TRUE",
+            "SELECT t.id,",
+            "  COALESCE(t.table_number, 0) AS table_number,",
+            "  COALESCE(t.seats, 0) AS seats,",
+            "  COALESCE(f.name, '') AS floor_name",
+            "FROM restaurant_table t",
+            "LEFT JOIN restaurant_floor f ON f.id = t.floor_id",
+            "WHERE t.active IS TRUE",
         ]
         params = []
-        if zone:
-            sql.append("AND zone = %s")
-            params.append(zone)
 
-        sql.append("ORDER BY id ASC")
+        if zone:
+            floor_ids = self._get_floor_ids_for_zone(zone)
+            if floor_ids:
+                sql.append("AND t.floor_id IN %s")
+                params.append(tuple(floor_ids))
+            else:
+                # No valid floors for this zone → return empty
+                return []
+
+        sql.append("ORDER BY t.table_number ASC")
         self.env.cr.execute(" ".join(sql), params)
         tables = self.env.cr.dictfetchall()
-        available_tables = []
 
+        available_tables = []
         for table in tables:
-            if table["capacity"] < party_size:
+            if table["seats"] < party_size:
                 continue
+
             overlap_domain = [
                 ("id", "!=", exclude_reservation_id or 0),
                 ("table_id", "=", table["id"]),
@@ -92,9 +124,28 @@ class RestaurantTableReservation(models.Model):
                 ("end_datetime", ">", start_datetime),
             ]
             if not self.search_count(overlap_domain):
-                available_tables.append(table)
+                # Determine zone from floor name
+                fname = (table["floor_name"] or "").strip().lower()
+                if "interior" in fname:
+                    table_zone = "main"
+                elif "patio" in fname:
+                    table_zone = "patio"
+                else:
+                    table_zone = ""
+
+                available_tables.append({
+                    "id": table["id"],
+                    "name": str(table["table_number"]),
+                    "capacity": table["seats"],
+                    "zone": table_zone,
+                    "notes": "",
+                })
 
         return available_tables
+
+    # ------------------------------------------------------------------
+    # CRUD
+    # ------------------------------------------------------------------
 
     @api.model
     def _sync_reservation_window(self, vals):
@@ -115,12 +166,16 @@ class RestaurantTableReservation(models.Model):
             vals["end_datetime"] = fields.Datetime.to_string(self._get_end_datetime(start_datetime))
         return super().write(vals)
 
+    # ------------------------------------------------------------------
+    # Constraints
+    # ------------------------------------------------------------------
+
     @api.constrains("party_size", "start_datetime", "end_datetime", "table_id", "state")
     def _check_reservation_rules(self):
         for reservation in self:
             if reservation.party_size <= 0:
                 raise ValidationError(_("La cantidad de personas debe ser mayor a cero."))
-            if reservation.table_id and reservation.party_size > reservation.table_id.capacity:
+            if reservation.table_id and reservation.party_size > reservation.table_id.seats:
                 raise ValidationError(_("La reserva supera la capacidad de la mesa seleccionada."))
             if reservation.table_id and reservation.table_id.zone != reservation.zone:
                 raise ValidationError(_("La mesa seleccionada no coincide con la zona preferida."))
@@ -138,6 +193,10 @@ class RestaurantTableReservation(models.Model):
             ]
             if reservation.start_datetime and reservation.end_datetime and self.search_count(domain):
                 raise ValidationError(_("Ya existe una reserva activa para esa mesa en el horario indicado."))
+
+    # ------------------------------------------------------------------
+    # Actions
+    # ------------------------------------------------------------------
 
     def action_confirm(self):
         self.write({"state": "confirmed"})

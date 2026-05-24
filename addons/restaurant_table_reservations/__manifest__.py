@@ -9,6 +9,7 @@
         "base",
         "mail",
         "website",
+        "pos_restaurant",
         "restaurant_casa_vieja_base",
     ],
     "data": [
