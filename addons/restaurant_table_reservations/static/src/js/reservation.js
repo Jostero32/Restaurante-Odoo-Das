@@ -25,6 +25,31 @@ function formatDateTimeLabel(value) {
     }).format(date);
 }
 
+// Función: 15 mins
+function populateTimeOptions() {
+    const timeSelect = document.getElementById("time");
+    if (!timeSelect) return;
+
+    const preSelectedTime = timeSelect.getAttribute("data-selected");
+    
+    for (let h = 8; h <= 22; h++) { 
+        for (let m = 0; m < 60; m += 15) {
+            const hourStr = h.toString().padStart(2, "0");
+            const minStr = m.toString().padStart(2, "0");
+            const timeStr = `${hourStr}:${minStr}`;
+            
+            const option = document.createElement("option");
+            option.value = timeStr;
+            option.textContent = timeStr;
+            
+            if (preSelectedTime === timeStr) {
+                option.selected = true;
+            }
+            timeSelect.appendChild(option);
+        }
+    }
+}
+
 function initReservationPage() {
     const form = document.getElementById("reservation_form");
     const tableResults = document.getElementById("table_results");
@@ -32,15 +57,19 @@ function initReservationPage() {
         return;
     }
 
+    populateTimeOptions();
+
     const fields = {
         date: document.getElementById("date"),
         time: document.getElementById("time"),
         zone: document.getElementById("zone"),
         partySize: document.getElementById("party_size"),
         tableId: document.getElementById("table_id"),
+        phone: document.getElementById("customer_phone"),
         summary: document.getElementById("reservation_summary"),
         feedback: document.getElementById("availability_feedback"),
         windowFeedback: document.getElementById("reservation_window_feedback"),
+        submitBtn: document.getElementById("btn_submit_reservation")
     };
 
     const state = {
@@ -124,6 +153,52 @@ function initReservationPage() {
     [fields.date, fields.time, fields.zone, fields.partySize].forEach((input) => {
         input.addEventListener("change", scheduleUpdate);
         input.addEventListener("input", scheduleUpdate);
+    });
+
+    // --- CONTROL DE COLISIÓN AL MOMENTO DE RESERVAR ---
+    form.addEventListener("submit", async function(event) {
+        event.preventDefault(); 
+
+        if (fields.phone.value.length !== 10) {
+            alert('El número de teléfono debe tener exactamente 10 dígitos.');
+            return;
+        }
+        if (!state.selectedTableId) {
+            alert('Por favor, selecciona una mesa disponible antes de reservar.');
+            return;
+        }
+
+        fields.submitBtn.disabled = true;
+        fields.submitBtn.textContent = "Verificando...";
+
+        const url = `${AVAILABILITY_URL}?date=${encodeURIComponent(fields.date.value)}&time=${encodeURIComponent(fields.time.value)}&zone=${encodeURIComponent(fields.zone.value)}&party_size=${encodeURIComponent(fields.partySize.value)}`;
+        
+        try {
+            const response = await fetch(url, { headers: { Accept: "application/json" } });
+            const payload = await response.json();
+            const latestTables = payload.available_tables || [];
+            
+            const isStillAvailable = latestTables.some((table) => table.id === state.selectedTableId);
+
+            if (!isStillAvailable) {
+                alert("¡Lo sentimos! Esta mesa acaba de ser reservada por otra persona en este momento. Por favor, selecciona otra mesa o cambia la hora.");
+                state.tables = latestTables;
+                state.selectedTableId = null;
+                fields.tableId.value = "";
+                renderTables();
+                
+                fields.submitBtn.disabled = false;
+                fields.submitBtn.textContent = "Reservar ahora";
+                return;
+            }
+
+            form.submit();
+
+        } catch (error) {
+            alert("Error de conexión al verificar la mesa. Intente nuevamente.");
+            fields.submitBtn.disabled = false;
+            fields.submitBtn.textContent = "Reservar ahora";
+        }
     });
 
     renderTables();
