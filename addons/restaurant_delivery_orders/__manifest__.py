@@ -21,6 +21,7 @@
         "data/website_cleanup.xml",
         "security/ir.model.access.csv",
         "security/ir_rule.xml",
+        "views/res_company_views.xml",
         "views/delivery_order_views.xml",
         "views/delivery_incident_views.xml",
         "views/sale_order_views.xml",

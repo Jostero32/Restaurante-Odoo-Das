@@ -39,6 +39,50 @@ class SaleOrder(models.Model):
             return has_lines
         return False
 
+    def _requires_fixed_delivery_fee(self):
+        self.ensure_one()
+        return bool(self.website_id) and self.state in {"sent", "sale", "cancel"}
+
+    def _ensure_fixed_delivery_fee_line(self):
+        SaleOrderLine = self.env["sale.order.line"]
+        for order in self:
+            if not order._requires_fixed_delivery_fee():
+                continue
+
+            company = order.company_id
+            fee_amount = company.delivery_fixed_fee or 0.0
+            fee_product = company.delivery_fee_product_id or company._get_or_create_delivery_fee_product()
+            if not fee_product:
+                continue
+
+            fee_lines = order.order_line.filtered(
+                lambda line: not line.display_type and line.is_delivery_fee
+            )
+            if fee_amount <= 0:
+                fee_lines.with_context(skip_delivery_line_sync=True).unlink()
+                continue
+
+            product_taxes = fee_product.taxes_id.filtered(
+                lambda tax: not tax.company_id or tax.company_id == order.company_id
+            )
+            line_vals = {
+                "name": fee_product.with_context(lang=order.partner_id.lang).get_product_multiline_description_sale(),
+                "product_id": fee_product.id,
+                "product_uom_qty": 1.0,
+                "product_uom": fee_product.uom_id.id,
+                "price_unit": fee_amount,
+                "tax_id": [(6, 0, product_taxes.ids)],
+                "is_delivery_fee": True,
+            }
+            if fee_lines:
+                main_line = fee_lines[0]
+                main_line.with_context(skip_delivery_line_sync=True).write(line_vals)
+                if len(fee_lines) > 1:
+                    fee_lines[1:].with_context(skip_delivery_line_sync=True).unlink()
+            else:
+                line_vals["order_id"] = order.id
+                SaleOrderLine.with_context(skip_delivery_line_sync=True).create(line_vals)
+
     def _prepare_delivery_order_vals(self, current_delivery_order=None):
         self.ensure_one()
         shipping_partner = self.partner_shipping_id or self.partner_id
@@ -75,6 +119,7 @@ class SaleOrder(models.Model):
         for order in self:
             if not order._is_delivery_sync_candidate():
                 continue
+            order._ensure_fixed_delivery_fee_line()
             delivery_order = order.delivery_order_id or DeliveryOrder.search(
                 [("sale_order_id", "=", order.id)], limit=1
             )
@@ -106,6 +151,7 @@ class SaleOrder(models.Model):
 
     def action_confirm(self):
         result = super().action_confirm()
+        self._ensure_fixed_delivery_fee_line()
         self._sync_delivery_order_from_sale()
         return result
 
@@ -120,6 +166,7 @@ class SaleOrder(models.Model):
             return result
         tracked_fields = {
             "state",
+            "website_id",
             "partner_id",
             "partner_shipping_id",
             "date_order",
@@ -128,6 +175,7 @@ class SaleOrder(models.Model):
             "note",
         }
         if tracked_fields.intersection(vals):
+            self._ensure_fixed_delivery_fee_line()
             self._sync_delivery_order_from_sale()
         return result
 
