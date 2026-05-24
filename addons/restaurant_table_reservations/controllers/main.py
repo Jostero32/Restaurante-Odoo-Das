@@ -21,12 +21,11 @@ class RestaurantTableReservationController(http.Controller):
 
     def _build_context(self, **kwargs):
         reservation_model = request.env["restaurant.table.reservation"].sudo()
-        table_model = request.env["restaurant.table"].sudo()
         zone = kwargs.get("zone") or "main"
         party_size = self._safe_int(kwargs.get("party_size"), 2)
         start_datetime = self._parse_start_datetime(kwargs.get("date"), kwargs.get("time"))
 
-        available_tables = table_model.browse()
+        available_tables = []
         reservation_window_end = False
         if start_datetime:
             reservation_window_end = fields.Datetime.to_string(
@@ -80,7 +79,7 @@ class RestaurantTableReservationController(http.Controller):
                         "main": "Interior",
                         "patio": "Patio",
                     }.get(table["zone"], table["zone"]),
-                    "notes": table["notes"] or "",
+                    "notes": table.get("notes", ""),
                 }
                 for table in context["available_tables"]
             ],

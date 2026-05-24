@@ -59,11 +59,11 @@ function initReservationPage() {
         tableResults.innerHTML = state.tables
             .map((table) => {
                 const selectedClass = state.selectedTableId === table.id ? "is-selected" : "";
-                const tableName = table.name || `Mesa ${table.id}`;
+                const tableName = `Mesa ${table.name || table.id}`;
                 return `
                     <button type="button" class="o_table_card ${selectedClass}" data-table-id="${table.id}">
                         <span class="o_table_card_name">${escapeHtml(tableName)}</span>
-                        <span class="o_table_card_meta">${escapeHtml(table.zone_label)} · Capacidad ${table.capacity}</span>
+                        <span class="o_table_card_meta">${escapeHtml(table.zone_label)} · ${table.capacity} personas</span>
                         <span class="o_table_card_notes">${escapeHtml(table.notes || "Mesa disponible")}</span>
                     </button>`;
             })
