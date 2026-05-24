@@ -155,7 +155,7 @@ function initReservationPage() {
         input.addEventListener("input", scheduleUpdate);
     });
 
-    // --- CONTROL DE COLISIÓN AL MOMENTO DE RESERVAR ---
+    // --- CONTROL DE RESERVAR ---
     form.addEventListener("submit", async function(event) {
         event.preventDefault(); 
 

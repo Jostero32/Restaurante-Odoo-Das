@@ -9,7 +9,7 @@
                         <p class="o_reservation_kicker">Restaurante Casa Vieja</p>
                         <h1>Reserva tu mesa en tiempo real</h1>
                         <p>
-                               Elige si prefieres el salón interior o el patio. La reserva
+                            Elige si prefieres el salón interior o el patio. La reserva
                             bloquea la mesa por 1 hora y 15 minutos, incluyendo margen de salida.
                         </p>
                     </div>
@@ -32,15 +32,15 @@
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label class="form-label" for="customer_name">Nombre *</label>
-                                        <input id="customer_name" name="customer_name" class="form-control" required="required" t-att-value="customer_name"/>
+                                        <input id="customer_name" name="customer_name" class="form-control" required="required" t-att-value="customer_name" maxlength="50" pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+" title="Solo se permiten letras y espacios" oninput="this.value = this.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');"/>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label" for="customer_phone">Teléfono</label>
-                                        <input id="customer_phone" name="customer_phone" class="form-control" t-att-value="customer_phone"/>
+                                        <input id="customer_phone" name="customer_phone" class="form-control" t-att-value="customer_phone" type="tel" pattern="[0-9]{10}" maxlength="10" minlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '');" title="Ingrese exactamente 10 dígitos numéricos" required="required"/>
                                     </div>
                                     <div class="col-md-4">
                                         <label class="form-label" for="party_size">Personas *</label>
-                                        <input id="party_size" name="party_size" type="number" min="1" class="form-control" required="required" t-att-value="selected_party_size"/>
+                                        <input id="party_size" name="party_size" type="number" min="1" max="20" step="1" class="form-control" required="required" t-att-value="selected_party_size" oninput="this.value = this.value.replace(/[^0-9]/g, '');"/>
                                     </div>
                                     <div class="col-md-4">
                                         <label class="form-label" for="date">Fecha *</label>
@@ -48,14 +48,16 @@
                                     </div>
                                     <div class="col-md-4">
                                         <label class="form-label" for="time">Hora *</label>
-                                        <input id="time" name="time" type="time" class="form-control" required="required" t-att-value="selected_time" step="900"/>
+                                        <select id="time" name="time" class="form-select" required="required" t-att-data-selected="selected_time">
+                                            <option value="">Selecciona...</option>
+                                        </select>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label" for="zone">Zona preferida *</label>
-                                            <select id="zone" name="zone" class="form-select" required="required">
-                                                <option value="main" t-att-selected="selected_zone == 'main' and 'selected' or None">Interior</option>
-                                                <option value="patio" t-att-selected="selected_zone == 'patio' and 'selected' or None">Patio</option>
-                                            </select>
+                                        <select id="zone" name="zone" class="form-select" required="required">
+                                            <option value="main" t-att-selected="selected_zone == 'main' and 'selected' or None">Interior</option>
+                                            <option value="patio" t-att-selected="selected_zone == 'patio' and 'selected' or None">Patio</option>
+                                        </select>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label">Mesa disponible *</label>
@@ -66,12 +68,12 @@
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label" for="notes">Notas</label>
-                                        <textarea id="notes" name="notes" class="form-control" rows="4"><t t-esc="notes"/></textarea>
+                                        <textarea id="notes" name="notes" class="form-control" rows="4" maxlength="500"><t t-esc="notes"/></textarea>
                                     </div>
                                 </div>
 
                                 <div class="mt-4 d-flex flex-wrap gap-3 align-items-center">
-                                    <button type="submit" class="btn btn-primary btn-lg">Reservar ahora</button>
+                                    <button type="submit" id="btn_submit_reservation" class="btn btn-primary btn-lg">Reservar ahora</button>
                                     <div class="o_reservation_summary" id="reservation_summary">
                                         <span>Duración de mesa: 1 hora + 15 minutos de margen.</span>
                                     </div>
@@ -93,6 +95,19 @@
                     </div>
                 </section>
             </div>
+            
+            <script type="text/javascript">
+                document.addEventListener("DOMContentLoaded", function() {
+                    /* Solo mantenemos aquí el bloqueo de fechas pasadas */
+                    var dateInput = document.getElementById('date');
+                    if (dateInput) {
+                        var today = new Date();
+                        today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+                        var todayString = today.toISOString().split('T')[0];
+                        dateInput.setAttribute('min', todayString);
+                    }
+                });
+            </script>
         </t>
     </template>
 
