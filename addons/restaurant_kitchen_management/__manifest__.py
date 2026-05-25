@@ -18,6 +18,7 @@
         'security/security.xml',
         'security/ir.model.access.csv',
         'data/kitchen_sequence.xml',
+        'views/product_views.xml',
     ],
     'installable': True,
     'application': True,
