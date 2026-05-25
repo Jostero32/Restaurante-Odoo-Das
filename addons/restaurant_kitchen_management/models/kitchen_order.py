@@ -129,6 +129,18 @@ class RestaurantKitchenOrder(models.Model):
             "state": "ready",
             "ready_at": fields.Datetime.now(),
         })
+        # Propagar el estado al pedido delivery (si aplica)
+        for order in self:
+            delivery = order.delivery_order_id
+            if delivery and not delivery.kitchen_ready:
+                delivery.sudo().write({"kitchen_ready": True})
+                delivery.sudo().message_post(
+                    body=_(
+                        "Cocina marco el pedido como listo para despacho (orden %s)."
+                    ) % order.name,
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_note",
+                )
 
     def action_served(self):
         self.write({

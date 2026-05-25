@@ -19,6 +19,7 @@
         'data/kitchen_sequence.xml',
         'views/kitchen_order_views.xml',
         'views/product_views.xml',
+        'views/delivery_order_views.xml',
         'views/menu.xml',
     ],
     'installable': True,
