@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_kitchen_order_user,kitchen.order.user,model_restaurant_kitchen_order,group_kitchen_user,1,1,1,0
+access_kitchen_order_manager,kitchen.order.manager,model_restaurant_kitchen_order,group_kitchen_manager,1,1,1,1
+access_kitchen_line_user,kitchen.order.line.user,model_restaurant_kitchen_order_line,group_kitchen_user,1,1,1,0
+access_kitchen_line_manager,kitchen.order.line.manager,model_restaurant_kitchen_order_line,group_kitchen_manager,1,1,1,1

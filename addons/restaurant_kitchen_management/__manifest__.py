@@ -14,7 +14,11 @@
         'restaurant_casa_vieja_base',
         'restaurant_delivery_orders',
     ],
-    'data': [],
+    'data': [
+        'security/security.xml',
+        'security/ir.model.access.csv',
+        'data/kitchen_sequence.xml',
+    ],
     'installable': True,
     'application': True,
     'auto_install': False,
