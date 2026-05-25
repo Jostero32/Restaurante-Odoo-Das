@@ -1,0 +1,19 @@
+/*
+ * Estilos para los componentes del modulo de cocina dentro del POS.
+ */
+
+.send-to-kitchen-btn {
+    background-color: #f5f1ea;
+    border: 1px solid #d8c9b0;
+    color: #5a3d1a;
+    font-weight: 600;
+
+    &:hover {
+        background-color: #e8dcc1;
+        color: #3d2810;
+    }
+
+    .fa {
+        color: #a05a2c;
+    }
+}

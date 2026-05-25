@@ -150,3 +150,122 @@ class RestaurantKitchenOrder(models.Model):
 
     def action_cancel(self):
         self.write({"state": "cancelled"})
+
+    # ------------------------------------------------------------------
+    # API para el POS (RPC desde JavaScript / OWL)
+    # ------------------------------------------------------------------
+    @api.model
+    def create_from_pos(self, pos_order_id, lines_data, context_data=None):
+        """Crea una orden de cocina desde el POS.
+
+        :param pos_order_id: ID de la pos.order (puede ser False si aun no se guardo)
+        :param lines_data: lista de dicts con
+            {product_id, quantity, line_note, source_pos_line_uuid}
+        :param context_data: dict opcional con {table_id, partner_id, session_id}
+            usado cuando la pos.order aun no se ha persistido en el backend.
+        :return: dict con kitchen_order_id, name, line_count o warning.
+        """
+        context_data = context_data or {}
+        if not lines_data:
+            return {"warning": _("No hay productos para enviar a cocina.")}
+
+        # Filtrar duplicados por UUID si ya existe una orden para esta pos.order
+        existing = self.env["restaurant.kitchen.order"]
+        if pos_order_id:
+            existing = self.search([("pos_order_id", "=", pos_order_id)])
+        existing_uuids = set(existing.mapped("line_ids.source_pos_line_uuid"))
+        new_lines = [
+            ld for ld in lines_data
+            if not ld.get("source_pos_line_uuid")
+            or ld["source_pos_line_uuid"] not in existing_uuids
+        ]
+        if not new_lines:
+            return {"warning": _("Los productos ya fueron enviados a cocina.")}
+
+        # Resolver mesa / cliente / sesion: primero del pos.order si existe,
+        # si no del context_data enviado desde el POS frontend.
+        pos_order = self.env["pos.order"].browse(pos_order_id) if pos_order_id else False
+        table_id = False
+        partner_id = False
+        session_id = False
+        if pos_order and pos_order.exists():
+            table_id = pos_order.table_id.id if "table_id" in pos_order._fields and pos_order.table_id else False
+            partner_id = pos_order.partner_id.id if pos_order.partner_id else False
+            session_id = pos_order.session_id.id if pos_order.session_id else False
+        table_id = table_id or context_data.get("table_id") or False
+        partner_id = partner_id or context_data.get("partner_id") or False
+        session_id = session_id or context_data.get("session_id") or False
+
+        # Si ya existe una orden activa para esta pos.order, le sumamos lineas
+        # en lugar de crear una nueva. Asi soportamos pedidos modificados.
+        active = existing.filtered(lambda k: k.state in ("new", "preparing"))
+        if active:
+            target = active[:1]
+            target.write({
+                "line_ids": [(0, 0, ld) for ld in new_lines],
+            })
+            target.message_post(
+                body=_("Se agregaron %s productos adicionales desde POS.") % len(new_lines),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
+            return {
+                "kitchen_order_id": target.id,
+                "name": target.name,
+                "line_count": len(new_lines),
+                "appended": True,
+            }
+
+        # Caso normal: crear orden nueva
+        kitchen_order = self.create({
+            "origin_type": "pos",
+            "pos_order_id": pos_order.id if pos_order else False,
+            "pos_session_id": session_id,
+            "table_id": table_id,
+            "partner_id": partner_id,
+            "line_ids": [(0, 0, ld) for ld in new_lines],
+        })
+        return {
+            "kitchen_order_id": kitchen_order.id,
+            "name": kitchen_order.name,
+            "line_count": len(new_lines),
+            "appended": False,
+        }
+
+    @api.model
+    def get_orders_for_pos(self, session_id=None, states=None):
+        """Devuelve ordenes de cocina del origen POS para el frontend del POS.
+
+        :param session_id: ID de la sesion POS para filtrar (opcional)
+        :param states: lista de estados a incluir; default ['new','preparing','ready']
+        :return: lista de dicts con resumen de cada orden.
+        """
+        states = states or ["new", "preparing", "ready"]
+        domain = [("origin_type", "=", "pos"), ("state", "in", states)]
+        if session_id:
+            domain.append(("pos_session_id", "=", session_id))
+        orders = self.search(domain, order="sent_at desc", limit=200)
+        return [{
+            "id": o.id,
+            "name": o.name,
+            "state": o.state,
+            "table_id": o.table_id.id if o.table_id else False,
+            "table_name": o.table_id.name if o.table_id else "",
+            "pos_order_id": o.pos_order_id.id if o.pos_order_id else False,
+            "sent_at": fields.Datetime.to_string(o.sent_at) if o.sent_at else False,
+            "ready_at": fields.Datetime.to_string(o.ready_at) if o.ready_at else False,
+            "line_count": len(o.line_ids),
+            "products": [
+                {
+                    "name": l.product_id.display_name,
+                    "qty": l.quantity,
+                    "note": l.line_note or "",
+                }
+                for l in o.line_ids
+            ],
+        } for o in orders]
+
+    def mark_served_from_pos(self):
+        """Wrapper para llamar action_served desde el POS via RPC."""
+        self.action_served()
+        return True

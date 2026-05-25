@@ -22,6 +22,14 @@
         'views/delivery_order_views.xml',
         'views/menu.xml',
     ],
+    'assets': {
+        'point_of_sale._assets_pos': [
+            'restaurant_kitchen_management/static/src/js/kitchen_service.js',
+            'restaurant_kitchen_management/static/src/js/product_screen_kitchen.js',
+            'restaurant_kitchen_management/static/src/xml/kitchen_buttons.xml',
+            'restaurant_kitchen_management/static/src/scss/kitchen_pos.scss',
+        ],
+    },
     'installable': True,
     'application': True,
     'auto_install': False,
