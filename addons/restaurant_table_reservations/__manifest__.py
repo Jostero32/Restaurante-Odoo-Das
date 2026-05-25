@@ -24,6 +24,9 @@
             "restaurant_table_reservations/static/src/css/reservation.css",
             "restaurant_table_reservations/static/src/js/reservation.js",
         ],
+        "point_of_sale._assets_pos": [
+            "restaurant_table_reservations/static/src/**/*",
+        ],
     },
     "installable": True,
     "application": False,

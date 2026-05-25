@@ -10,6 +10,7 @@
                 <field name="seats" string="Capacidad"/>
                 <field name="floor_id" string="Piso"/>
                 <field name="zone" string="Zona"/>
+                <field name="current_arrangement" string="Arreglo"/>
                 <field name="active"/>
             </list>
         </field>
@@ -27,6 +28,7 @@
                         <field name="seats" string="Capacidad"/>
                         <field name="floor_id" string="Piso"/>
                         <field name="zone" string="Zona"/>
+                        <field name="current_arrangement" string="Arreglo"/>
                         <field name="shape"/>
                         <field name="active"/>
                     </group>

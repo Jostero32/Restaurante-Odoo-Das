@@ -31,22 +31,37 @@ function populateTimeOptions() {
     if (!timeSelect) return;
 
     const preSelectedTime = timeSelect.getAttribute("data-selected");
-    
-    for (let h = 8; h <= 22; h++) { 
+    const selectedDate = document.getElementById("date")?.value;
+    const today = new Date();
+    today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+    const todayString = today.toISOString().split("T")[0];
+
+    timeSelect.innerHTML = '<option value="">Selecciona...</option>';
+
+    const baseOptions = [];
+    for (let h = 8; h <= 22; h++) {
         for (let m = 0; m < 60; m += 15) {
-            const hourStr = h.toString().padStart(2, "0");
-            const minStr = m.toString().padStart(2, "0");
-            const timeStr = `${hourStr}:${minStr}`;
-            
-            const option = document.createElement("option");
-            option.value = timeStr;
-            option.textContent = timeStr;
-            
-            if (preSelectedTime === timeStr) {
-                option.selected = true;
-            }
-            timeSelect.appendChild(option);
+            baseOptions.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
         }
+    }
+
+    const allowedOptions = selectedDate === todayString
+        ? baseOptions.filter((timeStr) => {
+            const [hour, minute] = timeStr.split(":").map((value) => Number(value));
+            const candidate = new Date(today);
+            candidate.setHours(hour, minute, 0, 0);
+            return candidate >= new Date();
+        })
+        : baseOptions;
+
+    for (const timeStr of allowedOptions) {
+        const option = document.createElement("option");
+        option.value = timeStr;
+        option.textContent = timeStr;
+        if (preSelectedTime === timeStr) {
+            option.selected = true;
+        }
+        timeSelect.appendChild(option);
     }
 }
 
@@ -112,6 +127,8 @@ function initReservationPage() {
         const time = fields.time.value;
         const zone = fields.zone.value;
         const partySize = fields.partySize.value || 2;
+        const arrangementTypeEl = document.getElementById('arrangement_type');
+        const arrangementType = arrangementTypeEl ? arrangementTypeEl.value : 'none';
 
         if (!date || !time) {
             fields.feedback.textContent = "Selecciona fecha y hora para ver mesas disponibles.";
@@ -119,10 +136,11 @@ function initReservationPage() {
             return;
         }
 
-        const url = `${AVAILABILITY_URL}?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&zone=${encodeURIComponent(zone)}&party_size=${encodeURIComponent(partySize)}`;
+        const url = `${AVAILABILITY_URL}?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&zone=${encodeURIComponent(zone)}&party_size=${encodeURIComponent(partySize)}&arrangement_type=${encodeURIComponent(arrangementType)}`;
         const response = await fetch(url, { headers: { Accept: "application/json" } });
         const payload = await response.json();
 
+        populateTimeOptions();
         state.tables = payload.available_tables || [];
         if (!state.tables.some((table) => table.id === state.selectedTableId)) {
             state.selectedTableId = null;
@@ -137,8 +155,27 @@ function initReservationPage() {
             ? `La mesa queda reservada hasta ${formatDateTimeLabel(payload.reservation_window_end)}.`
             : "";
 
+        if (payload.available_time_options && fields.time) {
+            const selectedTime = fields.time.value;
+            fields.time.innerHTML = '<option value="">Selecciona...</option>';
+            for (const timeValue of payload.available_time_options) {
+                const option = document.createElement("option");
+                option.value = timeValue;
+                option.textContent = timeValue;
+                if (timeValue === selectedTime || timeValue === fields.time.getAttribute("data-selected")) {
+                    option.selected = true;
+                }
+                fields.time.appendChild(option);
+            }
+        }
+
         if (fields.summary) {
-            fields.summary.textContent = `Duración de mesa: ${payload.reservation_duration_minutes || 60} minutos + ${payload.reservation_buffer_minutes || 15} minutos de margen.`;
+            let summaryText = `Duración de mesa: ${payload.reservation_duration_minutes || 60} minutos + ${payload.reservation_buffer_minutes || 15} minutos de margen.`;
+            if (arrangementType && arrangementType !== 'none') {
+                const selectedLabel = arrangementTypeEl.options[arrangementTypeEl.selectedIndex].textContent;
+                summaryText += `\nArreglo seleccionado: ${selectedLabel}`;
+            }
+            fields.summary.textContent = summaryText;
         }
 
         renderTables();

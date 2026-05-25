@@ -58,3 +58,62 @@ class RestaurantTable(models.Model):
                 raise ValidationError(
                     _("La capacidad de la mesa debe ser mayor a cero.")
                 )
+
+    current_arrangement = fields.Char(
+        string="Arreglo Actual",
+        compute="_compute_current_arrangement",
+        help="Arreglo especial asociado a la reserva activa de la mesa (si existe).",
+    )
+
+    @api.model
+    def _get_active_reservation_for_table(self, table_id, reference_datetime=None):
+        reference_datetime = reference_datetime or fields.Datetime.now()
+        return self.env["restaurant.table.reservation"].sudo().search(
+            [
+                ("table_id", "=", table_id),
+                ("state", "not in", ("cancelled", "done")),
+                ("start_datetime", "<=", reference_datetime),
+                ("end_datetime", ">=", reference_datetime),
+            ],
+            order="start_datetime desc, id desc",
+            limit=1,
+        )
+
+    @api.model
+    def get_pos_reservation_snapshot(self, config_id=None):
+        now = fields.Datetime.now()
+        reservations = self.env["restaurant.table.reservation"].sudo().search(
+            [
+                ("state", "not in", ("cancelled", "done")),
+                ("start_datetime", "<=", now),
+                ("end_datetime", ">=", now),
+            ]
+        )
+        snapshot = {}
+        for reservation in reservations:
+            snapshot[reservation.table_id.id] = {
+                "reservation_id": reservation.id,
+                "table_id": reservation.table_id.id,
+                "state": reservation.state,
+                "arrangement_type": reservation.arrangement_type,
+                "arrangement_label": reservation._get_arrangement_label(reservation.arrangement_type),
+                "customer_name": reservation.customer_name,
+                "start_datetime": fields.Datetime.to_string(reservation.start_datetime),
+                "end_datetime": fields.Datetime.to_string(reservation.end_datetime),
+            }
+        return snapshot
+
+    @api.model
+    def finalize_pos_reservation_for_table(self, table_id):
+        reservation = self._get_active_reservation_for_table(table_id)
+        if reservation:
+            reservation.action_done()
+        return bool(reservation)
+
+    def _compute_current_arrangement(self):
+        now = fields.Datetime.now()
+        for table in self:
+            reservation = self._get_active_reservation_for_table(table.id, reference_datetime=now)
+            table.current_arrangement = (
+                reservation._get_arrangement_label(reservation.arrangement_type) if reservation else ""
+            )

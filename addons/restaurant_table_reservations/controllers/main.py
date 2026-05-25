@@ -68,6 +68,8 @@ class RestaurantTableReservationController(http.Controller):
             "selected_party_size": party_size,
             "selected_date": kwargs.get("date") or "",
             "selected_time": kwargs.get("time") or "",
+            "selected_arrangement_type": kwargs.get("arrangement_type") or "none",
+            "available_time_options": reservation_model._get_time_options(kwargs.get("date")),
             "available_tables": available_tables,
             "reservation_window_end": reservation_window_end,
             "reservation_duration_minutes": reservation_model.RESERVATION_MINUTES,
@@ -110,8 +112,10 @@ class RestaurantTableReservationController(http.Controller):
             "reservation_window_end": context["reservation_window_end"],
             "reservation_duration_minutes": context["reservation_duration_minutes"],
             "reservation_buffer_minutes": context["reservation_buffer_minutes"],
+            "available_time_options": context["available_time_options"],
             "selected_zone": context["selected_zone"],
             "selected_party_size": context["selected_party_size"],
+            "selected_arrangement_type": context.get("selected_arrangement_type", "none"),
         }
         return request.make_response(json.dumps(payload), headers=[("Content-Type", "application/json")])
 
@@ -127,17 +131,17 @@ class RestaurantTableReservationController(http.Controller):
                 raise ValidationError(_("Debes elegir una mesa disponible."))
 
             reservation_model = request.env["restaurant.table.reservation"].sudo()
-            reservation_model.create(
-                {
-                    "customer_name": post.get("customer_name") or "",
-                    "customer_phone": post.get("customer_phone") or "",
-                    "party_size": int(post.get("party_size") or 2),
-                    "zone": post.get("zone") or "main",
-                    "table_id": table_id,
-                    "start_datetime": fields.Datetime.to_string(start_datetime),
-                    "notes": post.get("notes") or "",
-                }
-            )
+            reservation_vals = {
+                "customer_name": post.get("customer_name") or "",
+                "customer_phone": post.get("customer_phone") or "",
+                "party_size": int(post.get("party_size") or 2),
+                "zone": post.get("zone") or "main",
+                "table_id": table_id,
+                "start_datetime": fields.Datetime.to_string(start_datetime),
+                "notes": post.get("notes") or "",
+                "arrangement_type": post.get("arrangement_type") or "none",
+            }
+            reservation_model.create(reservation_vals)
         except (ValidationError, ValueError) as error:
             return request.redirect(f"/reservas?error={quote_plus(str(error))}")
 
