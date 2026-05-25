@@ -1,0 +1,21 @@
+{
+    'name': 'Gestion de Cocina Restaurante Casa Vieja',
+    'version': '1.0.0',
+    'category': 'Restaurant/Kitchen',
+    'summary': 'Tablero de cocina y gestion de ordenes preparables',
+    'author': 'ARCM Solutions',
+    'license': 'LGPL-3',
+    'depends': [
+        'base',
+        'mail',
+        'product',
+        'point_of_sale',
+        'pos_restaurant',
+        'restaurant_casa_vieja_base',
+        'restaurant_delivery_orders',
+    ],
+    'data': [],
+    'installable': True,
+    'application': True,
+    'auto_install': False,
+}
