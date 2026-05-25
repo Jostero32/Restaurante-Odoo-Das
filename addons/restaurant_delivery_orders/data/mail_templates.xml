@@ -14,6 +14,10 @@
                         <t t-out="object._get_customer_state_label()"/>
                     </span>
                 </p>
+                <p t-if="object.is_scheduled and object.scheduled_for_display"
+                   style="margin: 12px 0; padding: 10px 14px; background: #eef2ff; border-left: 4px solid #4338ca; border-radius: 6px;">
+                    <strong>Entrega programada:</strong> <t t-out="object.scheduled_for_display"/>
+                </p>
                 <p>
                     <strong>Entrega:</strong> <t t-out="object.delivery_address"/><br/>
                     <strong>ETA:</strong> <t t-out="object.eta_minutes"/> minutos<br/>

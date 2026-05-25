@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_restaurant_delivery_schedule_form" model="ir.ui.view">
+        <field name="name">restaurant.delivery.schedule.form</field>
+        <field name="model">restaurant.delivery.schedule</field>
+        <field name="arch" type="xml">
+            <form string="Horario de Delivery">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="company_id" options="{'no_create': True}"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="slot_minutes"/>
+                            <field name="min_lead_time_minutes"/>
+                            <field name="max_schedule_days"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Franjas semanales">
+                            <field name="line_ids">
+                                <list string="Franjas" editable="bottom">
+                                    <field name="day_of_week"/>
+                                    <field name="time_from" widget="float_time"/>
+                                    <field name="time_to" widget="float_time"/>
+                                </list>
+                            </field>
+                            <p class="text-muted small mt-2">
+                                Puede agregar varias franjas para el mismo dia (por ejemplo: 11:00 a 15:00 y 18:00 a 22:00).
+                            </p>
+                        </page>
+                        <page string="Excepciones (feriados / horarios especiales)">
+                            <field name="exception_ids">
+                                <list string="Excepciones" editable="bottom">
+                                    <field name="date"/>
+                                    <field name="name"/>
+                                    <field name="is_closed"/>
+                                    <field name="time_from" widget="float_time" invisible="is_closed"/>
+                                    <field name="time_to" widget="float_time" invisible="is_closed"/>
+                                </list>
+                            </field>
+                            <p class="text-muted small mt-2">
+                                Marque "Cerrado todo el dia" para feriados. Desmarquelo si solo cambia el horario ese dia.
+                            </p>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_restaurant_delivery_schedule_list" model="ir.ui.view">
+        <field name="name">restaurant.delivery.schedule.list</field>
+        <field name="model">restaurant.delivery.schedule</field>
+        <field name="arch" type="xml">
+            <list string="Horarios de Delivery">
+                <field name="company_id"/>
+                <field name="slot_minutes"/>
+                <field name="min_lead_time_minutes"/>
+                <field name="max_schedule_days"/>
+                <field name="active"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_restaurant_delivery_schedule" model="ir.actions.act_window">
+        <field name="name">Horario de Delivery</field>
+        <field name="res_model">restaurant.delivery.schedule</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Configure el horario en que el restaurante acepta pedidos delivery.
+            </p>
+            <p>
+                Defina franjas semanales y agregue excepciones para feriados u horarios especiales.
+            </p>
+        </field>
+    </record>
+</odoo>

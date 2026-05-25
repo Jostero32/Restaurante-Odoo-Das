@@ -116,6 +116,11 @@
                                         </span>
                                     </div>
 
+                                    <div t-if="order_data.get('is_scheduled')" class="alert alert-primary py-2 px-3 mt-2 mb-0 small d-flex align-items-center gap-2">
+                                        <i class="fa fa-calendar-check-o"/>
+                                        <span>Entrega programada para <strong t-out="order_data.get('scheduled_for_display')"/>.</span>
+                                    </div>
+
                                     <div class="row g-2 mt-2">
                                         <div class="col-12 col-md-6">
                                             <div class="rcv-pill rcv-pill-eta">
@@ -244,8 +249,12 @@
                                         </t>
                                     </div>
                                     <div class="d-flex gap-2">
-                                        <a t-att-href="row.get('detail_url')" class="btn btn-sm btn-outline-dark">Ver detalle</a>
-                                        <a t-att-href="row.get('pdf_url')" class="btn btn-sm btn-dark">PDF</a>
+                                        <a t-att-href="row.get('detail_url')" class="btn btn-sm btn-outline-dark">
+                                            <i class="fa fa-eye me-1"/>Ver detalle
+                                        </a>
+                                        <a t-att-href="row.get('pdf_url')" class="btn btn-sm btn-dark">
+                                            <i class="fa fa-download me-1"/>PDF
+                                        </a>
                                     </div>
                                 </div>
                             </div>
@@ -430,9 +439,19 @@
                                     <i class="fa fa-calendar me-1" title="Fecha"/> <span t-field="order.order_datetime" t-options="{'widget': 'datetime'}"/>
                                 </p>
                             </div>
-                            <span t-attf-class="badge rounded-pill text-bg-#{delivery_order_data.get('state_class')} fs-6 px-3 py-2">
+                            <span t-attf-class="badge rounded-pill text-bg-#{delivery_order_data.get('state_class')} fs-6 px-3 py-2 align-self-start">
                                 <t t-out="delivery_order_data.get('state_label')"/>
                             </span>
+                        </div>
+                        <div t-if="reorder_empty" class="alert alert-warning py-2 px-3 mt-3 mb-0 small">
+                            Ningun producto de este pedido sigue disponible en el menu.
+                        </div>
+                        <div t-if="delivery_order_data.get('is_scheduled')" class="alert alert-primary py-2 px-3 mt-3 mb-0 d-flex align-items-center gap-2">
+                            <i class="fa fa-calendar-check-o fa-lg"/>
+                            <div>
+                                <div class="fw-semibold">Entrega programada</div>
+                                <div class="small">Te lo entregamos <strong t-out="delivery_order_data.get('scheduled_for_display')"/>.</div>
+                            </div>
                         </div>
                         <div class="row g-2 mt-2">
                             <div class="col-12 col-md-4">
@@ -453,6 +472,30 @@
                                     <strong><span t-field="order.invoice_residual_amount"/></strong>
                                 </div>
                             </div>
+                        </div>
+                        <t t-set="primary_invoice" t-value="invoice_rows[0].get('record') if invoice_rows else None"/>
+                        <div class="d-flex flex-wrap gap-2 mt-3"
+                             t-if="delivery_order.state in ('delivered', 'cancelled') or primary_invoice">
+                            <form t-if="delivery_order.state in ('delivered', 'cancelled')"
+                                  t-attf-action="/my/delivery/#{delivery_order.id}/reorder"
+                                  method="post" class="m-0">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-dark">
+                                    <i class="fa fa-refresh me-2"/>Volver a pedir lo mismo
+                                </button>
+                            </form>
+                            <a t-if="primary_invoice"
+                               t-att-href="invoice_rows[0].get('pdf_url')"
+                               class="btn btn-outline-dark">
+                                <i class="fa fa-download me-2"/>Descargar factura
+                            </a>
+                            <a href="#delivery-chat" class="btn btn-outline-secondary">
+                                <i class="fa fa-comments me-2"/>Chat con el equipo
+                            </a>
+                            <a t-if="delivery_order.state == 'delivered' and not delivery_order.has_rating"
+                               href="#delivery-rating" class="btn btn-outline-warning">
+                                <i class="fa fa-star me-2"/>Califica tu pedido
+                            </a>
                         </div>
                     </div>
                 </header>
@@ -542,7 +585,14 @@
                                                     <td class="text-end"><span t-field="inv.amount_total"/></td>
                                                     <td class="text-end"><span t-field="inv.amount_residual"/></td>
                                                     <td class="text-end">
-                                                        <a t-att-href="row.get('detail_url')" class="btn btn-outline-dark btn-sm">Ver</a>
+                                                        <div class="btn-group btn-group-sm" role="group">
+                                                            <a t-att-href="row.get('detail_url')" class="btn btn-outline-dark" title="Ver detalle de la factura">
+                                                                <i class="fa fa-eye"/>
+                                                            </a>
+                                                            <a t-att-href="row.get('pdf_url')" class="btn btn-dark" title="Descargar PDF">
+                                                                <i class="fa fa-download"/>
+                                                            </a>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             </t>
@@ -604,6 +654,61 @@
                         </article>
                     </div>
                 </div>
+
+                <article t-if="delivery_order.state == 'delivered'" class="card border-0 shadow-sm mt-3" id="delivery-rating">
+                    <div class="card-body">
+                        <h5 class="mb-2">Como estuvo tu pedido?</h5>
+                        <div t-if="rating_submitted" class="alert alert-success py-2 px-3 small">
+                            Gracias por calificar! Recibimos tu opinion.
+                        </div>
+                        <div t-if="rating_error == 'duplicate'" class="alert alert-info py-2 px-3 small">
+                            Ya habias calificado este pedido.
+                        </div>
+                        <div t-if="rating_error == 'invalid'" class="alert alert-danger py-2 px-3 small">
+                            Selecciona entre 1 y 5 estrellas.
+                        </div>
+                        <div t-if="delivery_order.has_rating" class="d-flex flex-column gap-1">
+                            <div class="fs-3">
+                                <t t-foreach="range(1, 6)" t-as="i">
+                                    <i t-attf-class="fa #{'fa-star text-warning' if i &lt;= delivery_order.rating_score else 'fa-star-o text-muted'}"/>
+                                </t>
+                            </div>
+                            <div t-if="delivery_order.rating_comment" class="text-muted small fst-italic">
+                                "<t t-out="delivery_order.rating_comment"/>"
+                            </div>
+                        </div>
+                        <form t-if="not delivery_order.has_rating"
+                              t-attf-action="/my/delivery/#{delivery_order.id}/rate"
+                              method="post" class="d-flex flex-column gap-2">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <div class="rcv-stars d-flex flex-row-reverse justify-content-end gap-1 fs-3">
+                                <t t-foreach="[5, 4, 3, 2, 1]" t-as="s">
+                                    <input type="radio" t-attf-id="rate_#{s}" name="score" t-att-value="s" class="rcv-star-input visually-hidden" required="required"/>
+                                    <label t-attf-for="rate_#{s}" t-attf-title="#{s} estrella(s)" class="rcv-star-label">
+                                        <i class="fa fa-star"/>
+                                    </label>
+                                </t>
+                            </div>
+                            <textarea name="comment" rows="3" class="form-control" maxlength="500" placeholder="Cuentanos brevemente (opcional)"/>
+                            <button type="submit" class="btn btn-dark btn-sm align-self-start">Enviar calificacion</button>
+                        </form>
+                    </div>
+                </article>
+
+                <article class="card border-0 shadow-sm mt-3" id="delivery-chat">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <h5 class="mb-0">Chat con el equipo</h5>
+                            <span t-if="delivery_order.driver_id" class="badge text-bg-light border small">
+                                <i class="fa fa-motorcycle me-1"/>Repartidor: <t t-out="delivery_order.driver_id.name"/>
+                            </span>
+                        </div>
+                        <p class="text-muted small mb-3">
+                            Escribe aqui para coordinar la entrega con el restaurante o el repartidor. Los mensajes quedan registrados en el pedido.
+                        </p>
+                        <t t-call="portal.message_thread"/>
+                    </div>
+                </article>
             </section>
         </t>
     </template>

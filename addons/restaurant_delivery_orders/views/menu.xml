@@ -24,10 +24,33 @@
         sequence="20"/>
 
     <menuitem
+        id="menu_restaurant_delivery_ratings"
+        name="Calificaciones"
+        parent="menu_restaurant_delivery_root"
+        action="action_restaurant_delivery_ratings"
+        groups="restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
+        sequence="25"/>
+
+    <menuitem
         id="menu_restaurant_delivery_my_orders"
         name="Mis pedidos"
         parent="menu_restaurant_delivery_root"
         action="action_restaurant_delivery_orders_driver"
         groups="restaurant_casa_vieja_base.group_restaurant_repartidor"
         sequence="30"/>
+
+    <menuitem
+        id="menu_restaurant_delivery_configuration"
+        name="Configuracion"
+        parent="menu_restaurant_delivery_root"
+        groups="restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
+        sequence="90"/>
+
+    <menuitem
+        id="menu_restaurant_delivery_schedule"
+        name="Horario"
+        parent="menu_restaurant_delivery_configuration"
+        action="action_restaurant_delivery_schedule"
+        groups="restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
+        sequence="10"/>
 </odoo>

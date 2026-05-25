@@ -1,4 +1,5 @@
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 class SaleOrder(models.Model):
@@ -9,6 +10,15 @@ class SaleOrder(models.Model):
         string="Pedido delivery",
         copy=False,
         readonly=True,
+    )
+    delivery_is_scheduled = fields.Boolean(
+        string="Entrega programada",
+        copy=False,
+        default=False,
+    )
+    delivery_scheduled_for = fields.Datetime(
+        string="Programada para",
+        copy=False,
     )
 
     def _format_delivery_address(self):
@@ -239,6 +249,8 @@ class SaleOrder(models.Model):
             "notes": self.note or "",
             "sale_order_id": self.id,
             "state": mapped_state,
+            "is_scheduled": self.delivery_is_scheduled,
+            "scheduled_for": self.delivery_scheduled_for if self.delivery_is_scheduled else False,
         }
 
     def _sync_delivery_order_from_sale(self):
@@ -277,7 +289,21 @@ class SaleOrder(models.Model):
             skip_delivery_internal_notify=True,
         )._sync_delivery_order_from_sale()
 
+    def _validate_scheduled_delivery_slot(self):
+        Schedule = self.env["restaurant.delivery.schedule"].sudo()
+        for order in self:
+            if not order.delivery_is_scheduled:
+                continue
+            if not order.delivery_scheduled_for:
+                raise UserError(_("Selecciono entrega programada pero no eligio un horario."))
+            schedule = Schedule._get_or_create_for_company(order.company_id)
+            if not schedule.is_open_at(order.delivery_scheduled_for):
+                raise UserError(
+                    _("El horario seleccionado para la entrega ya no esta disponible. Por favor elija otro slot.")
+                )
+
     def action_confirm(self):
+        self._validate_scheduled_delivery_slot()
         result = super().action_confirm()
         self._ensure_fixed_delivery_fee_line()
         self._sync_delivery_order_from_sale()
@@ -301,6 +327,8 @@ class SaleOrder(models.Model):
             "amount_total",
             "currency_id",
             "note",
+            "delivery_is_scheduled",
+            "delivery_scheduled_for",
         }
         if tracked_fields.intersection(vals):
             self._ensure_fixed_delivery_fee_line()

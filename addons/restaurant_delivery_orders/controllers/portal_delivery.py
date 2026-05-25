@@ -96,25 +96,27 @@ class RestaurantDeliveryPortal(CustomerPortal):
             "issues": {"label": _("Con incidencias"), "domain": [("incident_ids", "!=", False)]},
         }
 
-    def _get_delivery_state_class(self, state):
+    def _get_delivery_state_class(self, state_or_key):
         return {
+            "scheduled_received": "primary",
             "draft": "info",
             "confirmed": "info",
             "assigned": "info",
             "on_route": "warning",
             "delivered": "success",
             "cancelled": "dark",
-        }.get(state, "secondary")
+        }.get(state_or_key, "secondary")
 
-    def _get_delivery_state_label(self, state):
+    def _get_delivery_state_label(self, state_or_key):
         return {
+            "scheduled_received": _("Pedido recibido"),
             "draft": _("En preparacion"),
             "confirmed": _("En preparacion"),
             "assigned": _("En preparacion"),
             "on_route": _("En camino"),
             "delivered": _("Entregado"),
             "cancelled": _("Cancelado"),
-        }.get(state, _("En proceso"))
+        }.get(state_or_key, _("En proceso"))
 
     def _get_delivery_invoice_searchbar_sortings(self):
         return {
@@ -194,21 +196,31 @@ class RestaurantDeliveryPortal(CustomerPortal):
         }
 
     def _get_delivery_progress_steps(self, order):
+        is_scheduled_received = order.display_state_key == "scheduled_received"
+        sequence = (
+            ["received", "preparing", "on_route", "delivered"]
+            if is_scheduled_received or order.is_scheduled
+            else ["preparing", "on_route", "delivered"]
+        )
         progress_state = {
+            "scheduled_received": "received",
             "draft": "preparing",
             "confirmed": "preparing",
             "assigned": "preparing",
             "on_route": "on_route",
             "delivered": "delivered",
-        }.get(order.state)
-        sequence = ["preparing", "on_route", "delivered"]
+        }.get(order.display_state_key)
+        # Cuando ya pasamos de "Recibido" a operativo en pedido programado, "received" queda hecho.
+        if order.is_scheduled and progress_state != "received" and "received" in sequence:
+            pass  # logica abajo marca done por indice
         current_index = sequence.index(progress_state) if progress_state in sequence else -1
-        steps = []
         labels = {
+            "received": _("Recibido"),
             "preparing": _("En preparacion"),
             "on_route": _("En camino"),
             "delivered": _("Entregado"),
         }
+        steps = []
         for index, state_key in enumerate(sequence):
             steps.append(
                 {
@@ -224,15 +236,19 @@ class RestaurantDeliveryPortal(CustomerPortal):
 
     def _prepare_delivery_order_portal_dict(self, order):
         posted_invoices = order.linked_invoice_ids.filtered(lambda inv: inv.state == "posted")
+        display_key = order.display_state_key
         return {
             "record": order,
-            "state_label": self._get_delivery_state_label(order.state),
-            "state_class": self._get_delivery_state_class(order.state),
+            "state_label": self._get_delivery_state_label(display_key),
+            "state_class": self._get_delivery_state_class(display_key),
             "invoice_posted_count": len(posted_invoices),
             "invoice_unpaid_count": len(
                 posted_invoices.filtered(lambda inv: inv.payment_state not in {"paid", "reversed"})
             ),
             "progress_steps": self._get_delivery_progress_steps(order),
+            "is_scheduled": bool(order.is_scheduled and order.scheduled_for),
+            "is_scheduled_received": display_key == "scheduled_received",
+            "scheduled_for_display": order.scheduled_for_display or "",
         }
 
     @http.route(
@@ -410,6 +426,11 @@ class RestaurantDeliveryPortal(CustomerPortal):
                 "incidents": order_sudo.incident_ids.sudo(),
                 "incident_submitted": kw.get("incident_submitted"),
                 "incident_error": kw.get("incident_error"),
+                "reorder_added": kw.get("reorder_added"),
+                "reorder_skipped": kw.get("reorder_skipped"),
+                "reorder_empty": kw.get("reorder_empty"),
+                "rating_submitted": kw.get("rating_submitted"),
+                "rating_error": kw.get("rating_error"),
                 "page_name": "delivery_order",
             }
         )
@@ -422,6 +443,108 @@ class RestaurantDeliveryPortal(CustomerPortal):
             **kw,
         )
         return request.render("restaurant_delivery_orders.portal_delivery_order_page", values)
+
+    @http.route(
+        ["/my/delivery/<int:order_id>/rate"],
+        type="http",
+        auth="user",
+        website=True,
+        methods=["POST"],
+    )
+    def portal_rate_delivery(self, order_id, **post):
+        partner = request.env.user.partner_id.commercial_partner_id
+        order = request.env["restaurant.delivery.order"].sudo().search(
+            [("id", "=", order_id), ("partner_id", "child_of", [partner.id])],
+            limit=1,
+        )
+        if not order:
+            return request.redirect("/my/delivery")
+        if order.state != "delivered":
+            return request.redirect(f"/my/delivery/{order.id}?rating_error=state")
+        if order.has_rating:
+            return request.redirect(f"/my/delivery/{order.id}?rating_error=duplicate")
+
+        score = (post.get("score") or "").strip()
+        if score not in {"1", "2", "3", "4", "5"}:
+            return request.redirect(f"/my/delivery/{order.id}?rating_error=invalid")
+        comment = (post.get("comment") or "").strip() or False
+
+        request.env["restaurant.delivery.rating"].sudo().create(
+            {
+                "delivery_order_id": order.id,
+                "partner_id": partner.id,
+                "driver_id": order.driver_id.id or False,
+                "score": score,
+                "comment": comment,
+            }
+        )
+        order.sudo().message_post(
+            body=request.env._(
+                "Calificacion del cliente: %s estrellas%s"
+            ) % (score, (" - %s" % comment) if comment else ""),
+            message_type="comment",
+            subtype_xmlid="mail.mt_note",
+        )
+        return request.redirect(f"/my/delivery/{order.id}?rating_submitted=1#delivery-rating")
+
+    @http.route(
+        ["/my/delivery/<int:order_id>/reorder"],
+        type="http",
+        auth="user",
+        website=True,
+        methods=["POST"],
+    )
+    def portal_reorder_delivery(self, order_id, **post):
+        partner = request.env.user.partner_id.commercial_partner_id
+        order = request.env["restaurant.delivery.order"].sudo().search(
+            [("id", "=", order_id), ("partner_id", "child_of", [partner.id])],
+            limit=1,
+        )
+        if not order or not order.sale_order_id:
+            return request.redirect("/my/delivery")
+        if order.state not in {"delivered", "cancelled"}:
+            return request.redirect(f"/my/delivery/{order.id}")
+
+        source_lines = order.sale_order_id.order_line.filtered(
+            lambda line: not line.display_type
+            and not line.is_delivery_fee
+            and not getattr(line, "is_delivery", False)
+            and line.product_id
+        )
+        if not source_lines:
+            return request.redirect(f"/my/delivery/{order.id}?reorder_empty=1")
+
+        website = request.website
+        cart = website.sale_get_order(force_create=True)
+        added_count = 0
+        skipped_count = 0
+        for line in source_lines:
+            product = line.product_id.with_context(website_sale_force_publish=False)
+            try:
+                if not product.exists() or not product.sale_ok:
+                    skipped_count += 1
+                    continue
+                if hasattr(product, "is_published") and not product.sudo().is_published:
+                    skipped_count += 1
+                    continue
+                qty_to_add = int(line.product_uom_qty or 1)
+                if qty_to_add <= 0:
+                    qty_to_add = 1
+                cart.with_context(website_id=website.id)._cart_update(
+                    product_id=product.id,
+                    add_qty=qty_to_add,
+                )
+                added_count += 1
+            except Exception:
+                skipped_count += 1
+                continue
+
+        if added_count == 0:
+            return request.redirect(f"/my/delivery/{order.id}?reorder_empty=1")
+        params = f"reorder_added={added_count}"
+        if skipped_count:
+            params += f"&reorder_skipped={skipped_count}"
+        return request.redirect(f"/shop/cart?{params}")
 
     @http.route(
         ["/my/delivery/<int:order_id>/incident"],

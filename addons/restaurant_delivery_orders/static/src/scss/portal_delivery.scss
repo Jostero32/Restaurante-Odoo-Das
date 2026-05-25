@@ -203,3 +203,26 @@
         min-width: auto;
     }
 }
+
+.rcv-stars {
+    direction: ltr;
+    user-select: none;
+}
+.rcv-stars .rcv-star-label {
+    cursor: pointer;
+    color: #cbd5e1 !important;
+    transition: color 0.12s ease, transform 0.12s ease;
+}
+.rcv-stars .rcv-star-label:hover {
+    transform: scale(1.08);
+}
+.rcv-stars .rcv-star-input:checked ~ .rcv-star-label,
+.rcv-stars .rcv-star-label:hover,
+.rcv-stars .rcv-star-label:hover ~ .rcv-star-label {
+    color: #f59e0b !important;
+}
+.rcv-stars .rcv-star-input:focus-visible ~ .rcv-star-label {
+    outline: 2px solid #4338ca;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
