@@ -454,6 +454,9 @@ class RestaurantDeliveryOrder(models.Model):
         if invalid:
             raise UserError(_("Solo se pueden entregar pedidos en ruta."))
         self.write({"state": "delivered"})
+        sale_orders = self.mapped("sale_order_id").filtered(lambda order: order.state != "cancel")
+        if sale_orders:
+            sale_orders.sudo().action_finalize_delivery_invoicing()
 
     def action_cancel(self):
         if self._is_repartidor_only_user():
