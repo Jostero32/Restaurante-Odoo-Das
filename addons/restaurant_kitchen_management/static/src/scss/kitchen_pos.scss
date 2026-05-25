@@ -17,3 +17,67 @@
         color: #a05a2c;
     }
 }
+
+.kitchen-status-btn {
+    background-color: #fff8f0;
+    border: 1px solid #d8c9b0;
+    color: #5a3d1a;
+    font-weight: 600;
+
+    &:hover {
+        background-color: #f5e6cc;
+    }
+
+    .kitchen-ready-badge {
+        font-size: 0.7rem;
+        padding: 0.25em 0.45em;
+    }
+}
+
+.kitchen-popup {
+    .kitchen-section h5 {
+        border-bottom: 1px solid #e9ecef;
+        padding-bottom: 0.4rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .list-group-item {
+        padding: 0.65rem 0.85rem;
+    }
+}
+
+/*
+ * Badge sobre cada mesa del FloorScreen segun su estado de cocina.
+ */
+.kitchen-table-status {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    color: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    z-index: 2;
+
+    &.new {
+        background-color: #17a2b8;
+    }
+    &.preparing {
+        background-color: #f39c12;
+        animation: kitchen-pulse 1.6s ease-in-out infinite;
+    }
+    &.ready {
+        background-color: #28a745;
+        animation: kitchen-pulse 1s ease-in-out infinite;
+    }
+}
+
+@keyframes kitchen-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%      { transform: scale(1.15); opacity: 0.8; }
+}

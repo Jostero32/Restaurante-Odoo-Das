@@ -1,39 +1,123 @@
 /** @odoo-module **/
 
 import { registry } from "@web/core/registry";
+import { reactive } from "@odoo/owl";
 
 /**
  * Servicio de cocina para el POS.
  *
- * Centraliza las llamadas RPC al modelo restaurant.kitchen.order para:
- *  - enviar productos a cocina desde el POS
- *  - consultar ordenes en preparacion / listas
- *  - marcar una orden como servida
+ * Expone:
+ *  - Llamadas RPC a restaurant.kitchen.order:
+ *      sendToKitchen, fetchActiveOrders, markServed
+ *  - Un store reactivo con las ordenes activas (new / preparing / ready)
+ *      state.orders         -> lista plana de ordenes
+ *      state.readyOrders    -> solo state='ready'
+ *      state.byTable        -> { table_id: [orders] }
+ *      state.lastRefresh    -> timestamp del ultimo refresh exitoso
+ *  - Polling automatico (startPolling / stopPolling / refreshNow)
  *
- * Se inyecta como `kitchen` en los componentes OWL del POS.
+ * Los componentes OWL del POS pueden hacer `useState` sobre `state`
+ * para actualizarse cuando llegue una orden lista.
  */
 export const kitchenService = {
     dependencies: ["orm", "pos"],
 
     start(env, { orm, pos }) {
+        const state = reactive({
+            orders: [],
+            readyOrders: [],
+            byTable: {},
+            lastRefresh: null,
+            polling: false,
+        });
+
+        let pollTimer = null;
+        let lastReadyIds = new Set();
+        const readyListeners = new Set();
+
+        function _indexOrders(orders) {
+            state.orders = orders;
+            state.readyOrders = orders.filter((o) => o.state === "ready");
+            const byTable = {};
+            for (const o of orders) {
+                if (!o.table_id) continue;
+                if (!byTable[o.table_id]) byTable[o.table_id] = [];
+                byTable[o.table_id].push(o);
+            }
+            state.byTable = byTable;
+            state.lastRefresh = Date.now();
+
+            // Detectar ordenes que pasaron a ready desde el ultimo refresh
+            const currentReadyIds = new Set(state.readyOrders.map((o) => o.id));
+            const newlyReady = state.readyOrders.filter((o) => !lastReadyIds.has(o.id));
+            lastReadyIds = currentReadyIds;
+            if (newlyReady.length > 0) {
+                for (const listener of readyListeners) {
+                    try {
+                        listener(newlyReady);
+                    } catch (e) {
+                        console.warn("[kitchen] listener error:", e);
+                    }
+                }
+            }
+        }
+
+        async function refreshNow() {
+            const sessionId = pos.session && pos.session.id;
+            try {
+                const orders = await orm.call(
+                    "restaurant.kitchen.order",
+                    "get_orders_for_pos",
+                    [sessionId || false, ["new", "preparing", "ready"]],
+                );
+                _indexOrders(orders || []);
+                return orders;
+            } catch (e) {
+                console.warn("[kitchen] refresh failed:", e);
+                return [];
+            }
+        }
+
+        function startPolling(intervalMs = 12000) {
+            if (pollTimer) return;
+            state.polling = true;
+            // Primer refresh inmediato
+            refreshNow();
+            pollTimer = setInterval(refreshNow, intervalMs);
+        }
+
+        function stopPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+            state.polling = false;
+        }
+
+        /**
+         * Permite suscribirse a "nuevas ordenes que pasaron a ready".
+         * Retorna funcion de unsubscribe.
+         */
+        function onReady(callback) {
+            readyListeners.add(callback);
+            return () => readyListeners.delete(callback);
+        }
+
         return {
-            /**
-             * Envia las lineas preparables del pedido actual a cocina.
-             * @param {Array} linesData - lista de {product_id, quantity, line_note, source_pos_line_uuid}
-             * @param {Object} contextData - {table_id, partner_id, session_id, pos_order_id}
-             */
+            state,
+
             async sendToKitchen(linesData, contextData = {}) {
                 const posOrderId = contextData.pos_order_id || false;
-                return await orm.call(
+                const result = await orm.call(
                     "restaurant.kitchen.order",
                     "create_from_pos",
                     [posOrderId, linesData, contextData],
                 );
+                // Refresco oportunista
+                refreshNow();
+                return result;
             },
 
-            /**
-             * Devuelve las ordenes de cocina activas para esta sesion POS.
-             */
             async fetchActiveOrders(sessionId, states) {
                 return await orm.call(
                     "restaurant.kitchen.order",
@@ -42,16 +126,20 @@ export const kitchenService = {
                 );
             },
 
-            /**
-             * Marca una orden de cocina como servida desde el POS.
-             */
             async markServed(kitchenOrderId) {
-                return await orm.call(
+                const res = await orm.call(
                     "restaurant.kitchen.order",
                     "mark_served_from_pos",
                     [[kitchenOrderId]],
                 );
+                refreshNow();
+                return res;
             },
+
+            startPolling,
+            stopPolling,
+            refreshNow,
+            onReady,
         };
     },
 };

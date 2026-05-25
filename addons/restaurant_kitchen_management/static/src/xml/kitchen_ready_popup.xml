@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+
+    <t t-name="restaurant_kitchen_management.KitchenReadyPopup">
+        <Dialog title.translate="Estado de Cocina" size="'lg'">
+            <div class="kitchen-popup">
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <strong t-esc="state.orders.length"/>
+                        <span class="ms-1">ordenes activas</span>
+                        <span class="ms-3 text-muted small"
+                              t-if="state.lastRefresh">
+                            Ultimo refresh:
+                            <t t-esc="new Date(state.lastRefresh).toLocaleTimeString()"/>
+                        </span>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary"
+                            t-on-click="onClickRefresh">
+                        <i class="fa fa-refresh me-1"/> Refrescar
+                    </button>
+                </div>
+
+                <!-- Listas -->
+                <div t-if="readyOrders.length > 0" class="kitchen-section mb-4">
+                    <h5 class="text-success">
+                        <i class="fa fa-check-circle me-1"/>
+                        Listas para retirar (<t t-esc="readyOrders.length"/>)
+                    </h5>
+                    <div class="list-group">
+                        <div t-foreach="readyOrders" t-as="order" t-key="order.id"
+                             class="list-group-item d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center">
+                                    <strong t-esc="order.name"/>
+                                    <span class="badge ms-2"
+                                          t-att-class="stateBadgeClass(order.state)">
+                                        <t t-esc="stateLabel(order.state)"/>
+                                    </span>
+                                    <span t-if="order.table_name" class="ms-2 text-muted">
+                                        <i class="fa fa-cutlery me-1"/>
+                                        Mesa <t t-esc="order.table_name"/>
+                                    </span>
+                                </div>
+                                <ul class="small mt-2 mb-0 ps-3">
+                                    <li t-foreach="order.products" t-as="p" t-key="p_index">
+                                        <strong t-esc="p.qty"/>
+                                        x
+                                        <t t-esc="p.name"/>
+                                        <span t-if="p.note" class="text-muted ms-1">
+                                            (<t t-esc="p.note"/>)
+                                        </span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>
+                                <button class="btn btn-success btn-sm"
+                                        t-att-disabled="isBusy(order.id)"
+                                        t-on-click="() => this.onClickMarkServed(order)">
+                                    <i class="fa fa-hand-paper-o me-1"/>
+                                    Marcar servida
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- En preparacion -->
+                <div t-if="preparingOrders.length > 0" class="kitchen-section mb-4">
+                    <h5 class="text-warning">
+                        <i class="fa fa-fire me-1"/>
+                        En preparacion (<t t-esc="preparingOrders.length"/>)
+                    </h5>
+                    <div class="list-group">
+                        <div t-foreach="preparingOrders" t-as="order" t-key="order.id"
+                             class="list-group-item">
+                            <div class="d-flex align-items-center">
+                                <strong t-esc="order.name"/>
+                                <span t-if="order.table_name" class="ms-2 text-muted">
+                                    Mesa <t t-esc="order.table_name"/>
+                                </span>
+                                <span class="ms-auto text-muted small"
+                                      t-esc="order.line_count + ' productos'"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nuevas -->
+                <div t-if="newOrders.length > 0" class="kitchen-section mb-4">
+                    <h5 class="text-info">
+                        <i class="fa fa-clock-o me-1"/>
+                        Nuevas (<t t-esc="newOrders.length"/>)
+                    </h5>
+                    <div class="list-group">
+                        <div t-foreach="newOrders" t-as="order" t-key="order.id"
+                             class="list-group-item">
+                            <div class="d-flex align-items-center">
+                                <strong t-esc="order.name"/>
+                                <span t-if="order.table_name" class="ms-2 text-muted">
+                                    Mesa <t t-esc="order.table_name"/>
+                                </span>
+                                <span class="ms-auto text-muted small"
+                                      t-esc="order.line_count + ' productos'"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vacio -->
+                <div t-if="!hasOrders" class="text-center text-muted py-5">
+                    <i class="fa fa-coffee fa-3x mb-3"/>
+                    <p>No hay ordenes activas en cocina.</p>
+                </div>
+
+            </div>
+
+            <t t-set-slot="footer">
+                <button class="btn btn-secondary" t-on-click="onClickClose">
+                    Cerrar
+                </button>
+            </t>
+        </Dialog>
+    </t>
+
+</templates>

@@ -2,16 +2,26 @@
 <templates id="template" xml:space="preserve">
 
     <!--
-        Inyecta el boton "Enviar a cocina" dentro del area de botones de
-        control de la ProductScreen del POS. Se usa el componente
-        ControlButtons como punto de extension.
+        Inyecta dos botones en el area de control de la ProductScreen:
+          - "Enviar a cocina"
+          - "Cocina" (abre el popup con el estado y un badge con el numero
+            de ordenes listas)
     -->
     <t t-inherit="point_of_sale.ControlButtons" t-inherit-mode="extension">
-        <xpath expr="//div" position="inside">
+        <xpath expr="." position="inside">
             <button class="control-button btn btn-light send-to-kitchen-btn"
                     t-on-click="onClickSendToKitchen">
                 <i class="fa fa-cutlery me-1" role="img" aria-label="Cocina"/>
                 <span>Enviar a cocina</span>
+            </button>
+            <button class="control-button btn btn-light kitchen-status-btn position-relative"
+                    t-on-click="onClickShowKitchenStatus">
+                <i class="fa fa-bell me-1" role="img" aria-label="Estado cocina"/>
+                <span>Cocina</span>
+                <span t-if="kitchenReadyCount > 0"
+                      class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-success kitchen-ready-badge">
+                    <t t-esc="kitchenReadyCount"/>
+                </span>
             </button>
         </xpath>
     </t>

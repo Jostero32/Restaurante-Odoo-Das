@@ -25,8 +25,12 @@
     'assets': {
         'point_of_sale._assets_pos': [
             'restaurant_kitchen_management/static/src/js/kitchen_service.js',
+            'restaurant_kitchen_management/static/src/js/kitchen_ready_popup.js',
             'restaurant_kitchen_management/static/src/js/product_screen_kitchen.js',
+            'restaurant_kitchen_management/static/src/js/floor_screen_kitchen_status.js',
             'restaurant_kitchen_management/static/src/xml/kitchen_buttons.xml',
+            'restaurant_kitchen_management/static/src/xml/kitchen_ready_popup.xml',
+            'restaurant_kitchen_management/static/src/xml/kitchen_floor_badges.xml',
             'restaurant_kitchen_management/static/src/scss/kitchen_pos.scss',
         ],
     },
