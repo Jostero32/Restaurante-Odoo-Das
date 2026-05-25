@@ -3,6 +3,7 @@
     <menuitem id="menu_kitchen_root"
               name="Cocina"
               parent="restaurant_casa_vieja_base.menu_restaurant_casa_vieja_root"
+              groups="restaurant_casa_vieja_base.group_restaurant_cocinero,restaurant_casa_vieja_base.group_restaurant_administrador"
               sequence="30"/>
 
     <menuitem id="menu_kitchen_orders"

@@ -15,7 +15,6 @@
         'restaurant_delivery_orders',
     ],
     'data': [
-        'security/security.xml',
         'security/ir.model.access.csv',
         'data/kitchen_sequence.xml',
         'views/kitchen_order_views.xml',
