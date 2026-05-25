@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_kitchen_root"
+              name="Cocina"
+              parent="restaurant_casa_vieja_base.menu_restaurant_casa_vieja_root"
+              sequence="30"/>
+
+    <menuitem id="menu_kitchen_orders"
+              name="Ordenes de Cocina"
+              parent="menu_kitchen_root"
+              action="action_kitchen_order"
+              sequence="10"/>
+</odoo>
