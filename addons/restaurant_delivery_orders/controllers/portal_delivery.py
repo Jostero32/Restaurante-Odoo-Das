@@ -1,25 +1,84 @@
 from collections import OrderedDict
 
-from odoo import _, http
+from odoo import _, fields, http
 from odoo.addons.portal.controllers.portal import CustomerPortal, pager as portal_pager
 from odoo.exceptions import AccessError, MissingError
 from odoo.http import request
+from odoo.tools.misc import format_amount
 
 
 class RestaurantDeliveryPortal(CustomerPortal):
     def _prepare_home_portal_values(self, counters):
         values = super()._prepare_home_portal_values(counters)
+        partner = request.env.user.partner_id.commercial_partner_id
         if "delivery_order_count" in counters:
-            partner = request.env.user.partner_id.commercial_partner_id
-            delivery_count = request.env["restaurant.delivery.order"].sudo().search_count(
+            values["delivery_order_count"] = request.env["restaurant.delivery.order"].sudo().search_count(
                 self._get_delivery_orders_domain(partner=partner)
             )
-            values["delivery_order_count"] = delivery_count
+        if "delivery_invoice_count" in counters or "delivery_invoice_pending_count" in counters:
+            invoices = self._get_delivery_invoice_records(partner=partner)
+            posted_invoices = invoices.filtered(lambda inv: inv.state == "posted")
+            values["delivery_invoice_count"] = len(invoices)
+            values["delivery_invoice_pending_count"] = len(
+                posted_invoices.filtered(lambda inv: inv.payment_state not in {"paid", "reversed"})
+            )
         return values
 
     def _get_delivery_orders_domain(self, partner=None):
         partner = partner or request.env.user.partner_id.commercial_partner_id
         return [("partner_id", "child_of", [partner.id])]
+
+    def _get_delivery_invoice_domain(self, partner=None):
+        partner = partner or request.env.user.partner_id.commercial_partner_id
+        sale_orders = request.env["sale.order"].sudo().search(
+            [
+                ("delivery_order_id", "!=", False),
+                ("delivery_order_id.partner_id", "child_of", [partner.id]),
+            ]
+        )
+        invoice_ids = sale_orders.mapped("invoice_ids").ids
+        if not invoice_ids:
+            return [("id", "=", 0)]
+        return [
+            ("id", "in", invoice_ids),
+            ("move_type", "in", ["out_invoice", "out_receipt"]),
+            ("state", "!=", "cancel"),
+        ]
+
+    def _get_delivery_invoice_records(self, partner=None):
+        return request.env["account.move"].sudo().search(self._get_delivery_invoice_domain(partner=partner))
+
+    def _get_delivery_portal_metrics(self, partner=None):
+        partner = partner or request.env.user.partner_id.commercial_partner_id
+        delivery_orders = request.env["restaurant.delivery.order"].sudo().search(
+            self._get_delivery_orders_domain(partner=partner)
+        )
+        invoices = self._get_delivery_invoice_records(partner=partner)
+        posted_invoices = invoices.filtered(lambda inv: inv.state == "posted")
+        pending_invoices = posted_invoices.filtered(
+            lambda inv: inv.payment_state not in {"paid", "reversed"}
+        )
+        paid_invoices = posted_invoices.filtered(lambda inv: inv.payment_state in {"paid", "reversed"})
+        pending_amount = sum(pending_invoices.mapped("amount_residual")) if pending_invoices else 0.0
+        total_amount = sum(posted_invoices.mapped("amount_total")) if posted_invoices else 0.0
+        return {
+            "orders_total": len(delivery_orders),
+            "orders_active": len(
+                delivery_orders.filtered(lambda order: order.state in {"draft", "confirmed", "assigned", "on_route"})
+            ),
+            "orders_delivered": len(delivery_orders.filtered(lambda order: order.state == "delivered")),
+            "invoice_total": len(invoices),
+            "invoice_posted": len(posted_invoices),
+            "invoice_pending": len(pending_invoices),
+            "invoice_paid": len(paid_invoices),
+            "invoice_pending_amount": pending_amount,
+            "invoice_pending_amount_display": format_amount(
+                request.env, pending_amount, request.env.company.currency_id
+            ),
+            "invoice_total_amount_display": format_amount(
+                request.env, total_amount, request.env.company.currency_id
+            ),
+        }
 
     def _get_delivery_searchbar_sortings(self):
         return {
@@ -56,6 +115,83 @@ class RestaurantDeliveryPortal(CustomerPortal):
             "delivered": _("Entregado"),
             "cancelled": _("Cancelado"),
         }.get(state, _("En proceso"))
+
+    def _get_delivery_invoice_searchbar_sortings(self):
+        return {
+            "date": {"label": _("Mas recientes"), "order": "invoice_date desc, create_date desc, id desc"},
+            "due": {"label": _("Vencimiento"), "order": "invoice_date_due asc, invoice_date desc"},
+            "amount": {"label": _("Mayor importe"), "order": "amount_total desc, invoice_date desc"},
+            "status": {"label": _("Estado"), "order": "state asc, payment_state asc, invoice_date desc"},
+        }
+
+    def _get_delivery_invoice_searchbar_filters(self):
+        today = fields.Date.today()
+        return {
+            "all": {"label": _("Todas"), "domain": []},
+            "draft": {"label": _("Borrador"), "domain": [("state", "=", "draft")]},
+            "pending": {
+                "label": _("Pendientes"),
+                "domain": [("state", "=", "posted"), ("payment_state", "in", ["not_paid", "partial", "in_payment"])],
+            },
+            "paid": {"label": _("Pagadas"), "domain": [("state", "=", "posted"), ("payment_state", "in", ["paid", "reversed"])]},
+            "overdue": {
+                "label": _("Vencidas"),
+                "domain": [
+                    ("state", "=", "posted"),
+                    ("payment_state", "in", ["not_paid", "partial", "in_payment"]),
+                    ("invoice_date_due", "!=", False),
+                    ("invoice_date_due", "<", today),
+                ],
+            },
+        }
+
+    def _get_delivery_invoice_state_label(self, invoice):
+        if invoice.state == "draft":
+            return _("Borrador")
+        if invoice.state != "posted":
+            return _("En proceso")
+        if invoice.payment_state in {"paid", "reversed"}:
+            return _("Pagada")
+        if invoice.payment_state in {"partial", "in_payment"}:
+            return _("Pago parcial")
+        return _("Pendiente de pago")
+
+    def _get_delivery_invoice_state_class(self, invoice):
+        if invoice.state == "draft":
+            return "secondary"
+        if invoice.state != "posted":
+            return "info"
+        if invoice.payment_state in {"paid", "reversed"}:
+            return "success"
+        if invoice.payment_state in {"partial", "in_payment"}:
+            return "warning"
+        return "danger"
+
+    def _prepare_delivery_invoice_portal_dict(self, invoice):
+        fee_lines = invoice.invoice_line_ids.filtered(
+            lambda line: line.sale_line_ids.filtered(lambda sale_line: sale_line.is_delivery_fee)
+        )
+        food_lines = invoice.invoice_line_ids.filtered(lambda line: not line.display_type) - fee_lines
+        related_delivery_orders = (
+            invoice.invoice_line_ids.sale_line_ids.order_id.mapped("delivery_order_id").filtered(lambda order: order)
+        )
+        is_pending = invoice.state == "posted" and invoice.payment_state not in {"paid", "reversed"}
+        is_overdue = bool(
+            is_pending and invoice.invoice_date_due and invoice.invoice_date_due < fields.Date.today()
+        )
+        return {
+            "record": invoice,
+            "state_label": self._get_delivery_invoice_state_label(invoice),
+            "state_class": self._get_delivery_invoice_state_class(invoice),
+            "food_subtotal": sum(food_lines.mapped("price_subtotal")) if food_lines else 0.0,
+            "delivery_fee": sum(fee_lines.mapped("price_subtotal")) if fee_lines else 0.0,
+            "invoice_total": invoice.amount_total,
+            "is_pending": is_pending,
+            "is_overdue": is_overdue,
+            "related_delivery_orders": related_delivery_orders,
+            "detail_url": f"/my/delivery/invoices/{invoice.id}",
+            "pdf_url": invoice.get_portal_url(report_type="pdf", download=True),
+        }
 
     def _get_delivery_progress_steps(self, order):
         progress_state = {
@@ -109,8 +245,9 @@ class RestaurantDeliveryPortal(CustomerPortal):
         self, page=1, date_begin=None, date_end=None, sortby=None, filterby=None, **kw
     ):
         values = self._prepare_portal_layout_values()
+        partner = request.env.user.partner_id.commercial_partner_id
         DeliveryOrder = request.env["restaurant.delivery.order"].sudo()
-        domain = self._get_delivery_orders_domain()
+        domain = self._get_delivery_orders_domain(partner=partner)
 
         searchbar_sortings = self._get_delivery_searchbar_sortings()
         if not sortby:
@@ -149,6 +286,7 @@ class RestaurantDeliveryPortal(CustomerPortal):
         values.update(
             {
                 "date": date_begin,
+                "delivery_portal_metrics": self._get_delivery_portal_metrics(partner=partner),
                 "delivery_orders": [self._prepare_delivery_order_portal_dict(order) for order in orders],
                 "page_name": "delivery_order",
                 "pager": pager,
@@ -160,6 +298,95 @@ class RestaurantDeliveryPortal(CustomerPortal):
             }
         )
         return request.render("restaurant_delivery_orders.portal_my_delivery_orders", values)
+
+    @http.route(
+        ["/my/delivery/invoices", "/my/delivery/invoices/page/<int:page>"],
+        type="http",
+        auth="user",
+        website=True,
+    )
+    def portal_my_delivery_invoices(
+        self, page=1, date_begin=None, date_end=None, sortby=None, filterby=None, **kw
+    ):
+        values = self._prepare_portal_layout_values()
+        partner = request.env.user.partner_id.commercial_partner_id
+        AccountMove = request.env["account.move"].sudo()
+        domain = self._get_delivery_invoice_domain(partner=partner)
+
+        searchbar_sortings = self._get_delivery_invoice_searchbar_sortings()
+        if not sortby:
+            sortby = "date"
+        order_by = searchbar_sortings[sortby]["order"]
+
+        searchbar_filters = self._get_delivery_invoice_searchbar_filters()
+        if not filterby:
+            filterby = "all"
+        domain += searchbar_filters[filterby]["domain"]
+
+        if date_begin and date_end:
+            domain += [("create_date", ">", date_begin), ("create_date", "<=", date_end)]
+
+        pager = portal_pager(
+            url="/my/delivery/invoices",
+            url_args={
+                "date_begin": date_begin,
+                "date_end": date_end,
+                "sortby": sortby,
+                "filterby": filterby,
+            },
+            total=AccountMove.search_count(domain),
+            page=page,
+            step=20,
+        )
+        invoices = AccountMove.search(domain, order=order_by, limit=20, offset=pager["offset"])
+        request.session["my_delivery_invoice_history"] = invoices.ids[:100]
+
+        values.update(
+            {
+                "date": date_begin,
+                "delivery_portal_metrics": self._get_delivery_portal_metrics(partner=partner),
+                "delivery_invoice_rows": [self._prepare_delivery_invoice_portal_dict(inv) for inv in invoices],
+                "page_name": "delivery_invoice",
+                "pager": pager,
+                "default_url": "/my/delivery/invoices",
+                "searchbar_sortings": searchbar_sortings,
+                "sortby": sortby,
+                "searchbar_filters": OrderedDict(sorted(searchbar_filters.items())),
+                "filterby": filterby,
+            }
+        )
+        return request.render("restaurant_delivery_orders.portal_my_delivery_invoices", values)
+
+    @http.route(["/my/delivery/invoices/<int:invoice_id>"], type="http", auth="user", website=True)
+    def portal_my_delivery_invoice_detail(self, invoice_id, **kw):
+        partner = request.env.user.partner_id.commercial_partner_id
+        invoice = request.env["account.move"].sudo().search(
+            self._get_delivery_invoice_domain(partner=partner) + [("id", "=", invoice_id)],
+            limit=1,
+        )
+        if not invoice:
+            return request.redirect("/my/delivery/invoices")
+
+        values = self._prepare_portal_layout_values()
+        invoice_data = self._prepare_delivery_invoice_portal_dict(invoice)
+        values.update(
+            {
+                "delivery_portal_metrics": self._get_delivery_portal_metrics(partner=partner),
+                "delivery_invoice_data": invoice_data,
+                "delivery_invoice": invoice,
+                "delivery_invoice_orders": invoice_data.get("related_delivery_orders"),
+                "page_name": "delivery_invoice",
+            }
+        )
+        values = self._get_page_view_values(
+            invoice,
+            False,
+            values,
+            "my_delivery_invoice_history",
+            False,
+            **kw,
+        )
+        return request.render("restaurant_delivery_orders.portal_delivery_invoice_page", values)
 
     @http.route(["/my/delivery/<int:order_id>"], type="http", auth="public", website=True)
     def portal_my_delivery_order_detail(self, order_id, access_token=None, **kw):
@@ -173,9 +400,13 @@ class RestaurantDeliveryPortal(CustomerPortal):
             {
                 "delivery_order_data": self._prepare_delivery_order_portal_dict(order_sudo),
                 "delivery_order": order_sudo,
-                "invoice_rows": order_sudo.linked_invoice_ids.sorted(
-                    key=lambda inv: inv.invoice_date or inv.create_date, reverse=True
-                ),
+                "invoice_rows": [
+                    self._prepare_delivery_invoice_portal_dict(inv)
+                    for inv in order_sudo.linked_invoice_ids.sorted(
+                        key=lambda inv: inv.invoice_date or inv.create_date,
+                        reverse=True,
+                    )
+                ],
                 "incidents": order_sudo.incident_ids.sudo(),
                 "incident_submitted": kw.get("incident_submitted"),
                 "incident_error": kw.get("incident_error"),
