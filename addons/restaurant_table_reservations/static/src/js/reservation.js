@@ -25,43 +25,50 @@ function formatDateTimeLabel(value) {
     }).format(date);
 }
 
-// Función: 15 mins
+// Función: Genera las horas de 15 en 15 mins y bloquea las horas pasadas del día actual
 function populateTimeOptions() {
     const timeSelect = document.getElementById("time");
-    if (!timeSelect) return;
+    const dateInput = document.getElementById("date");
+    if (!timeSelect || !dateInput) return;
 
-    const preSelectedTime = timeSelect.getAttribute("data-selected");
-    const selectedDate = document.getElementById("date")?.value;
-    const today = new Date();
-    today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
-    const todayString = today.toISOString().split("T")[0];
+    const preSelectedTime = timeSelect.value || timeSelect.getAttribute("data-selected");
+    const selectedDate = dateInput.value;
+
+    const now = new Date();
+    // Ajustar zona horaria local para comparar correctamente
+    const localToday = new Date(now);
+    localToday.setMinutes(localToday.getMinutes() - localToday.getTimezoneOffset());
+    const todayString = localToday.toISOString().split("T")[0];
+
+    const isToday = (selectedDate === todayString);
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
 
     timeSelect.innerHTML = '<option value="">Selecciona...</option>';
 
-    const baseOptions = [];
     for (let h = 8; h <= 22; h++) {
         for (let m = 0; m < 60; m += 15) {
-            baseOptions.push(`${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`);
-        }
-    }
+            
+            // CONTROL: Si es hoy, saltarse las horas que ya pasaron
+            if (isToday) {
+                if (h < currentHour || (h === currentHour && m <= currentMinute)) {
+                    continue; 
+                }
+            }
 
-    const allowedOptions = selectedDate === todayString
-        ? baseOptions.filter((timeStr) => {
-            const [hour, minute] = timeStr.split(":").map((value) => Number(value));
-            const candidate = new Date(today);
-            candidate.setHours(hour, minute, 0, 0);
-            return candidate >= new Date();
-        })
-        : baseOptions;
+            const hourStr = h.toString().padStart(2, "0");
+            const minStr = m.toString().padStart(2, "0");
+            const timeStr = `${hourStr}:${minStr}`;
 
-    for (const timeStr of allowedOptions) {
-        const option = document.createElement("option");
-        option.value = timeStr;
-        option.textContent = timeStr;
-        if (preSelectedTime === timeStr) {
-            option.selected = true;
+            const option = document.createElement("option");
+            option.value = timeStr;
+            option.textContent = timeStr;
+
+            if (preSelectedTime === timeStr) {
+                option.selected = true;
+            }
+            timeSelect.appendChild(option);
         }
-        timeSelect.appendChild(option);
     }
 }
 
@@ -140,7 +147,9 @@ function initReservationPage() {
         const response = await fetch(url, { headers: { Accept: "application/json" } });
         const payload = await response.json();
 
+        // Repopular siempre para mantener las horas correctas antes de cualquier override
         populateTimeOptions();
+        
         state.tables = payload.available_tables || [];
         if (!state.tables.some((table) => table.id === state.selectedTableId)) {
             state.selectedTableId = null;
@@ -187,9 +196,24 @@ function initReservationPage() {
         timeoutId = window.setTimeout(updateAvailability, 150);
     }
 
-    [fields.date, fields.time, fields.zone, fields.partySize].forEach((input) => {
-        input.addEventListener("change", scheduleUpdate);
-        input.addEventListener("input", scheduleUpdate);
+    // --- SEPARACIÓN DE EVENTOS (NUEVO) ---
+    
+    // Si cambia la fecha, primero validamos las horas (para quitar las del pasado si es 'hoy') y luego actualizamos
+    ["change", "input"].forEach(eventType => {
+        if(fields.date) {
+            fields.date.addEventListener(eventType, () => {
+                populateTimeOptions(); 
+                scheduleUpdate();      
+            });
+        }
+    });
+
+    // Si cambian los otros campos, solo buscamos mesas disponibles
+    [fields.time, fields.zone, fields.partySize].forEach((input) => {
+        if(input) {
+            input.addEventListener("change", scheduleUpdate);
+            input.addEventListener("input", scheduleUpdate);
+        }
     });
 
     // --- CONTROL DE RESERVAR ---
