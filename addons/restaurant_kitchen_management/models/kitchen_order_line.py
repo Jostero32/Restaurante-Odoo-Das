@@ -76,7 +76,7 @@ class RestaurantKitchenOrderLine(models.Model):
         string="Estado",
         default="pending",
         required=True,
-        tracking=False,  # El tracking se hace a nivel de orden, no línea
+        # El tracking se gestiona a nivel de orden, no de línea
     )
 
     # ─── Estado relacional (heredado de la orden) ─────────────────────────────

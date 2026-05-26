@@ -56,7 +56,7 @@
 
                         <!-- Mesa y cliente -->
                         <div class="mb-1">
-                            <i class="fa fa-cutlery me-1 text-muted"/>
+                            <i class="fa fa-cutlery me-1 text-muted" title="Mesa"/>
                             <t t-if="record.table_id.value">
                                 <field name="table_id"/>
                             </t>
@@ -66,21 +66,21 @@
                         </div>
                         <t t-if="record.partner_id.value">
                             <div class="mb-1">
-                                <i class="fa fa-user me-1 text-muted"/>
+                                <i class="fa fa-user me-1 text-muted" title="Cliente"/>
                                 <field name="partner_id"/>
                             </div>
                         </t>
 
                         <!-- Mesero -->
                         <div class="mb-1">
-                            <i class="fa fa-user-circle me-1 text-muted"/>
+                            <i class="fa fa-user-circle me-1 text-muted" title="Mesero"/>
                             <field name="waiter_user_id"/>
                         </div>
 
                         <!-- Notas -->
                         <t t-if="record.notes.value">
-                            <div class="alert alert-warning py-1 px-2 mb-1 small">
-                                <i class="fa fa-exclamation-triangle me-1"/>
+                            <div class="alert alert-warning py-1 px-2 mb-1 small" role="status">
+                                <i class="fa fa-exclamation-triangle me-1" title="Nota"/>
                                 <field name="notes"/>
                             </div>
                         </t>
@@ -88,7 +88,7 @@
                         <!-- Pie: hora enviada + nº ítems -->
                         <div class="d-flex justify-content-between align-items-center mt-2 pt-1 border-top text-muted small">
                             <span>
-                                <i class="fa fa-clock-o me-1"/>
+                                <i class="fa fa-clock-o me-1" title="Hora enviada"/>
                                 <field name="sent_at" widget="datetime"/>
                             </span>
                             <span class="badge text-bg-light border">
@@ -127,7 +127,7 @@
                        decoration-info="state == 'new'"
                        decoration-warning="state == 'preparing'"
                        decoration-success="state == 'ready'"
-                       decoration-secondary="state == 'served'"
+                       decoration-muted="state == 'served'"
                        decoration-danger="state == 'cancelled'"/>
                 <field name="sent_at" string="Enviada"/>
                 <field name="started_at" string="Inicio prep."/>
