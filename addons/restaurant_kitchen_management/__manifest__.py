@@ -30,10 +30,9 @@ las órdenes de preparación:
     ],
 
     'data': [
-        # Se irán agregando a medida que se creen los archivos:
-        # 'data/kitchen_sequence.xml',
-        # 'security/security.xml',
-        # 'security/ir.model.access.csv',
+        'data/kitchen_sequence.xml',
+        'security/ir.model.access.csv',
+        # Se agregarán en la Tarea 10:
         # 'views/kitchen_order_views.xml',
         # 'views/product_views.xml',
         # 'views/menu.xml',
