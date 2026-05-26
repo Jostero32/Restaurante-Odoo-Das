@@ -1,1 +1,2 @@
-# Los modelos se importarán aquí a medida que se vayan creando
+from . import kitchen_order
+from . import kitchen_order_line
