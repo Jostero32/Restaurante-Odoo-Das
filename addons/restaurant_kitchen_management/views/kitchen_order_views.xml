@@ -219,9 +219,7 @@
                     <!-- Líneas de la orden -->
                     <notebook>
                         <page string="Ítems de la orden" name="lines">
-                            <field name="line_ids"
-                                   widget="one2many_list"
-                                   context="{'default_kitchen_order_id': active_id}">
+                            <field name="line_ids">
                                 <list editable="bottom">
                                     <field name="sequence" widget="handle"/>
                                     <field name="product_id"/>
