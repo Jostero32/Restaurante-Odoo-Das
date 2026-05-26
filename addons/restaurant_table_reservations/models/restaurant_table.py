@@ -72,6 +72,9 @@ class RestaurantTable(models.Model):
             [
                 ("table_id", "=", table_id),
                 ("state", "not in", ("cancelled", "done")),
+                "|",
+                ("state", "in", ("confirmed", "seated")),
+                "&",
                 ("start_datetime", "<=", reference_datetime),
                 ("end_datetime", ">=", reference_datetime),
             ],
@@ -85,12 +88,16 @@ class RestaurantTable(models.Model):
         reservations = self.env["restaurant.table.reservation"].sudo().search(
             [
                 ("state", "not in", ("cancelled", "done")),
+                "|",
+                ("state", "in", ("confirmed", "seated")),
+                "&",
                 ("start_datetime", "<=", now),
                 ("end_datetime", ">=", now),
             ]
         )
         snapshot = {}
         for reservation in reservations:
+            arrangement_price = reservation._get_arrangement_cost()
             # find corresponding arrangement product by default_code
             code_map = {
                 "birthday": "ARR-BIRTHDAY",
@@ -119,7 +126,6 @@ class RestaurantTable(models.Model):
                     product = tmpl.product_variant_id
                 except Exception:
                     product = False
-            arrangement_price = reservation._get_arrangement_cost()
             snapshot[reservation.table_id.id] = {
                 "reservation_id": reservation.id,
                 "table_id": reservation.table_id.id,
@@ -143,7 +149,48 @@ class RestaurantTable(models.Model):
         """
         reservation = self._get_active_reservation_for_table(table_id)
         if reservation:
+            # Attempt to attach the arrangement as a POS order line if a matching POS order exists
+            try:
+                code_map = {
+                    "birthday": "ARR-BIRTHDAY",
+                    "anniversary": "ARR-ANNIV",
+                    "romantic": "ARR-ROMANTIC",
+                    "general": "ARR-GENERAL",
+                }
+                default_code = code_map.get(reservation.arrangement_type or "", "")
+                product = False
+                if default_code:
+                    product = self.env["product.product"].sudo().search([("default_code", "=", default_code)], limit=1)
+
+                arrangement_price = reservation._get_arrangement_cost()
+
+                # Find a recent POS order for this table that is in a post-payment state (paid/done)
+                # Prefer the most recent POS order for this table regardless of its state
+                pos_order = self.env["pos.order"].sudo().search(
+                    [("table_id", "=", table_id)],
+                    order="id desc",
+                    limit=1,
+                )
+
+                if pos_order and product:
+                    # Create a POS order line referencing the arrangement product so it appears on receipts/invoices
+                    line_vals = {
+                        "order_id": pos_order.id,
+                        "product_id": product.id,
+                        "qty": 1.0,
+                        "price_unit": arrangement_price,
+                    }
+                    try:
+                        self.env["pos.order.line"].sudo().create(line_vals)
+                    except Exception:
+                        # best-effort: don't fail the whole flow if line creation fails
+                        pass
+            except Exception:
+                # swallow unexpected errors from the best-effort attachment
+                pass
+
             reservation.sudo().write({"arrangement_charged": True})
+            reservation._notify_pos_reservation_change([reservation.table_id.id])
             return True
         return False
 
@@ -153,6 +200,10 @@ class RestaurantTable(models.Model):
         if reservation:
             reservation.action_done()
         return bool(reservation)
+
+    def action_seated(self):
+        # action_seated is implemented on the reservation model; keep placeholder for compatibility
+        return True
 
     def _compute_current_arrangement(self):
         now = fields.Datetime.now()

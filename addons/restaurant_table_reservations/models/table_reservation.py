@@ -5,6 +5,10 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError, ValidationError
 
 
+POS_RESERVATION_BUS_CHANNEL = "restaurant_table_reservations.snapshot"
+POS_RESERVATION_BUS_NOTIFICATION = "restaurant_table_reservations.snapshot_changed"
+
+
 class RestaurantTableReservation(models.Model):
     _name = "restaurant.table.reservation"
     _description = "Reserva de mesa"
@@ -289,15 +293,26 @@ class RestaurantTableReservation(models.Model):
 
     def action_confirm(self):
         self.write({"state": "confirmed"})
+        self._notify_pos_reservation_change()
 
     def action_seated(self):
         self.write({"state": "seated"})
+        self._notify_pos_reservation_change()
 
     def action_done(self):
         self.write({"state": "done"})
+        self._notify_pos_reservation_change()
 
     def action_cancel(self):
         active = self.filtered(lambda reservation: reservation.state in ("seated", "done"))
         if active:
             raise UserError(_("No puede cancelar una reserva sentada o finalizada."))
         self.write({"state": "cancelled"})
+        self._notify_pos_reservation_change()
+
+    def _notify_pos_reservation_change(self, table_ids=None):
+        self.env["bus.bus"]._sendone(
+            POS_RESERVATION_BUS_CHANNEL,
+            POS_RESERVATION_BUS_NOTIFICATION,
+            {"table_ids": table_ids or self.mapped("table_id").ids},
+        )
