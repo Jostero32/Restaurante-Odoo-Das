@@ -91,17 +91,61 @@ class RestaurantTable(models.Model):
         )
         snapshot = {}
         for reservation in reservations:
+            # find corresponding arrangement product by default_code
+            code_map = {
+                "birthday": "ARR-BIRTHDAY",
+                "anniversary": "ARR-ANNIV",
+                "romantic": "ARR-ROMANTIC",
+                "general": "ARR-GENERAL",
+            }
+            product = self.env["product.product"].sudo().search(
+                [("default_code", "=", code_map.get(reservation.arrangement_type or "", ""))],
+                limit=1,
+            )
+            # If product not found, create a product.template + variant so POS can reference it later
+            if not product and reservation.arrangement_type and reservation.arrangement_type != 'none':
+                code = code_map.get(reservation.arrangement_type or "", "")
+                try:
+                    tmpl_vals = {
+                        'name': reservation._get_arrangement_label(reservation.arrangement_type),
+                        'default_code': code,
+                        'type': 'service',
+                        'list_price': arrangement_price,
+                        'sale_ok': True,
+                        'base_unit_count': 1.0,
+                    }
+                    tmpl = self.env['product.template'].sudo().create(tmpl_vals)
+                    # product.product variant will be created automatically; get it
+                    product = tmpl.product_variant_id
+                except Exception:
+                    product = False
+            arrangement_price = reservation._get_arrangement_cost()
             snapshot[reservation.table_id.id] = {
                 "reservation_id": reservation.id,
                 "table_id": reservation.table_id.id,
                 "state": reservation.state,
                 "arrangement_type": reservation.arrangement_type,
                 "arrangement_label": reservation._get_arrangement_label(reservation.arrangement_type),
+                "arrangement_price": arrangement_price,
+                "arrangement_product_id": product.id if product else False,
+                "arrangement_charged": bool(reservation.arrangement_charged),
                 "customer_name": reservation.customer_name,
                 "start_datetime": fields.Datetime.to_string(reservation.start_datetime),
                 "end_datetime": fields.Datetime.to_string(reservation.end_datetime),
             }
         return snapshot
+
+    @api.model
+    def mark_reservation_charged_for_table(self, table_id):
+        """Mark the active reservation for a table as having its arrangement charged.
+
+        Returns True if a reservation was found and marked, False otherwise.
+        """
+        reservation = self._get_active_reservation_for_table(table_id)
+        if reservation:
+            reservation.sudo().write({"arrangement_charged": True})
+            return True
+        return False
 
     @api.model
     def finalize_pos_reservation_for_table(self, table_id):
