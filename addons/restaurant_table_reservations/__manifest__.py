@@ -10,6 +10,7 @@
         "mail",
         "website",
         "pos_restaurant",
+        "point_of_sale",
         "restaurant_casa_vieja_base",
     ],
     "data": [
@@ -24,7 +25,7 @@
             "restaurant_table_reservations/static/src/css/reservation.css",
             "restaurant_table_reservations/static/src/js/reservation.js",
         ],
-        "point_of_sale._assets_pos": [
+        "point_of_sale.assets": [
             "restaurant_table_reservations/static/src/**/*",
         ],
     },
