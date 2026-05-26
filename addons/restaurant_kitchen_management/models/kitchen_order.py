@@ -132,17 +132,59 @@ class RestaurantKitchenOrder(models.Model):
         # Propagar el estado al pedido delivery (si aplica)
         for order in self:
             delivery = order.delivery_order_id
-            if delivery and not delivery.kitchen_ready:
+            if not delivery:
+                continue
+            if not delivery.kitchen_ready:
                 delivery.sudo().write({"kitchen_ready": True})
+
+            # Notificar SIEMPRE al(los) repartidor(es) responsables y dejar
+            # un mensaje en el chatter del delivery con detalle accionable.
+            driver = delivery.driver_id
+            if driver:
+                # Mensaje dirigido al repartidor asignado.
                 delivery.sudo().message_post(
                     body=_(
-                        "Cocina marco el pedido como listo para despacho (orden %s)."
+                        "Cocina marco el pedido %(name)s como LISTO para despacho. "
+                        "Repartidor asignado: %(driver)s."
+                    ) % {"name": order.name, "driver": driver.name},
+                    partner_ids=[driver.partner_id.id] if driver.partner_id else [],
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_comment",
+                )
+                # Crear una actividad "todo" para el repartidor.
+                todo_type = self.env.ref(
+                    "mail.mail_activity_data_todo", raise_if_not_found=False
+                )
+                if todo_type:
+                    self.env["mail.activity"].sudo().create({
+                        "activity_type_id": todo_type.id,
+                        "res_model_id": self.env["ir.model"]._get_id(
+                            "restaurant.delivery.order"
+                        ),
+                        "res_id": delivery.id,
+                        "user_id": driver.id,
+                        "summary": _("Pedido listo para despacho"),
+                        "note": _(
+                            "El pedido %s ya esta listo en cocina. "
+                            "Recogerlo y salir a entregar."
+                        ) % delivery.name,
+                        "date_deadline": fields.Date.context_today(self),
+                    })
+            else:
+                # Sin repartidor: avisar a admin/administracion para asignar.
+                delivery.sudo().message_post(
+                    body=_(
+                        "Cocina marco el pedido %s como LISTO. "
+                        "Sin repartidor asignado: asigne uno para despachar."
                     ) % order.name,
                     message_type="comment",
                     subtype_xmlid="mail.mt_note",
                 )
 
     def action_served(self):
+        """Para POS = servida al cliente.
+        Para Delivery = despachada al repartidor.
+        """
         self.write({
             "state": "served",
             "served_at": fields.Datetime.now(),

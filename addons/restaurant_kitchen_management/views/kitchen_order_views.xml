@@ -52,7 +52,12 @@
                             string="Marcar Servida"
                             type="object"
                             class="oe_highlight"
-                            invisible="state != 'ready'"/>
+                            invisible="state != 'ready' or origin_type == 'delivery'"/>
+                    <button name="action_served"
+                            string="Marcar Despachada"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'ready' or origin_type != 'delivery'"/>
                     <button name="action_cancel"
                             string="Cancelar"
                             type="object"
@@ -162,7 +167,7 @@
                                 <field name="origin_type"/>
                             </div>
                             <div class="text-muted mt-1">
-                                <i class="fa fa-clock-o me-1"/>
+                                <i class="fa fa-clock-o me-1" title="Enviada"/>
                                 <field name="sent_at" widget="relative"/>
                             </div>
                         </div>
@@ -180,11 +185,17 @@
                                         class="btn btn-sm btn-success">
                                     <i class="fa fa-check"/> Lista
                                 </button>
-                                <button t-if="record.state.raw_value == 'ready'"
+                                <button t-if="record.state.raw_value == 'ready' and record.origin_type.raw_value != 'delivery'"
                                         name="action_served"
                                         type="object"
                                         class="btn btn-sm btn-info">
                                     <i class="fa fa-hand-paper-o"/> Servida
+                                </button>
+                                <button t-if="record.state.raw_value == 'ready' and record.origin_type.raw_value == 'delivery'"
+                                        name="action_served"
+                                        type="object"
+                                        class="btn btn-sm btn-info">
+                                    <i class="fa fa-truck"/> Despachada
                                 </button>
                             </div>
                         </div>
