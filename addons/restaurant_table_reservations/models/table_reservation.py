@@ -59,6 +59,23 @@ class RestaurantTableReservation(models.Model):
         tracking=True,
     )
 
+    arrangement_charged = fields.Boolean(
+        string="Arreglo Cobrado",
+        default=False,
+        help="Indica si el cargo por arreglo ya fue añadido a la orden POS para evitar dobles cargos.",
+    )
+
+    def _get_arrangement_cost(self):
+        """Return the numeric cost for the selected arrangement type."""
+        cost_map = {
+            "none": 0.0,
+            "birthday": 10.0,
+            "anniversary": 15.0,
+            "romantic": 20.0,
+            "general": 5.0,
+        }
+        return cost_map.get(self.arrangement_type or "none", 0.0)
+
     # ------------------------------------------------------------------
     # Onchange helpers
     # ------------------------------------------------------------------

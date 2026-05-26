@@ -1,6 +1,6 @@
 /** @odoo-module **/
 
-import { onMounted, onPatched, useExternalListener, useState } from "@odoo/owl";
+import { onMounted, onPatched, useExternalListener, useState, reactive } from "@odoo/owl";
 import { patch } from "@web/core/utils/patch";
 import { FloorScreen } from "@pos_restaurant/app/screens/floor_screen/floor_screen";
 import { ReceiptHeader } from "@point_of_sale/app/screens/receipt_screen/receipt/receipt_header/receipt_header";
@@ -123,6 +123,77 @@ patch(FloorScreen.prototype, {
                 await this.pos._refreshReservationSnapshot?.();
             }
             applySnapshot();
+
+            // Attach click handler to floor map to add arrangement product to current order
+            try {
+                if (this.map?.el) {
+                    this.map.el.addEventListener("click", async (ev) => {
+                        const tableEl = ev.target.closest?.(".table") || ev.target.closest(".table");
+                        if (!tableEl) return;
+                        const tableId = tableIdFromElement(tableEl);
+                        if (!tableId) return;
+                        const snapshot = this.pos?.reservationSnapshot?.[tableId];
+                        if (!snapshot) return;
+                        if (!snapshot.arrangement_product_id || snapshot.arrangement_charged) return;
+
+                        // Try to get product from POS models
+                        const productModel = this.pos.models && this.pos.models["product.product"];
+                        const product = productModel && (productModel.getBy ? productModel.getBy("id", snapshot.arrangement_product_id) : productModel.get(snapshot.arrangement_product_id));
+                        try {
+                            if (product) {
+                                await reactive(this.pos).addLineToCurrentOrder({ product_id: product }, {});
+                            } else {
+                                // Fallback: try to load product by id into POS models
+                                if (this.pos._loadMissingProducts) {
+                                    try {
+                                        await this.pos._loadMissingProducts([snapshot.arrangement_product_id]);
+                                    } catch (e) {
+                                        // ignore
+                                    }
+                                }
+                                let product2 = productModel && (productModel.getBy ? productModel.getBy("id", snapshot.arrangement_product_id) : productModel.get(snapshot.arrangement_product_id));
+                                if (product2) {
+                                    await reactive(this.pos).addLineToCurrentOrder({ product_id: product2 }, {});
+                                } else {
+                                    // Last resort: create a minimal in-memory product record so POS can add it
+                                    try {
+                                        const prodData = {
+                                            id: snapshot.arrangement_product_id || Math.floor(Math.random() * 1000000000),
+                                            name: snapshot.arrangement_label || "Arreglo",
+                                            display_name: snapshot.arrangement_label || "Arreglo",
+                                            list_price: snapshot.arrangement_price || 0.0,
+                                            taxes_id: [],
+                                            type: "service",
+                                        };
+                                        if (productModel && productModel.create) {
+                                            product2 = productModel.create(prodData);
+                                        } else if (this.pos.models && this.pos.models["product.product"] && this.pos.models["product.product"].create) {
+                                            product2 = this.pos.models["product.product"].create(prodData);
+                                        }
+                                        if (product2) {
+                                            await reactive(this.pos).addLineToCurrentOrder({ product_id: product2 }, {});
+                                        } else {
+                                            console.warn("Unable to create in-memory arrangement product for POS", prodData);
+                                            return;
+                                        }
+                                    } catch (err) {
+                                        console.error("Fallback: failed to create temporary product:", err);
+                                        return;
+                                    }
+                                }
+                            }
+                            // Mark reservation as charged on server
+                            await this.pos.data.call("restaurant.table", "mark_reservation_charged_for_table", [tableId]);
+                            this.pos.reservationSnapshot[tableId].arrangement_charged = true;
+                            this.reservationUiState.revision += 1;
+                        } catch (err) {
+                            console.error("Failed to add arrangement line:", err);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Error attaching table click handler:", err);
+            }
         });
 
         onPatched(() => {
