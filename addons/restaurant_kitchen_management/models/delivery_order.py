@@ -26,7 +26,10 @@ class RestaurantDeliveryOrder(models.Model):
         """Construye los valores para crear la orden de cocina desde un delivery."""
         self.ensure_one()
         lines_vals = []
-        sale_lines = self.sale_order_id.sudo().order_line.filtered(
+        # Sin sudo(): si el usuario puede confirmar el delivery, ya tiene
+        # permisos para leer las lineas del sale.order asociado. Mantener
+        # la trazabilidad de permisos es mas auditable.
+        sale_lines = self.sale_order_id.order_line.filtered(
             lambda l: not l.display_type
             and l.product_id
             and l.product_id.product_tmpl_id.kitchen_preparable
@@ -74,4 +77,22 @@ class RestaurantDeliveryOrder(models.Model):
     def action_confirm(self):
         result = super().action_confirm()
         self._ensure_kitchen_order()
+        return result
+
+    def action_cancel(self):
+        # Cancelar la orden de cocina asociada (si esta activa) para que
+        # la cocina no siga preparando un pedido que ya fue cancelado.
+        result = super().action_cancel()
+        for order in self:
+            kitchen_order = order.kitchen_order_id
+            if kitchen_order and kitchen_order.state not in ("served", "cancelled"):
+                kitchen_order.sudo().action_cancel()
+                order.sudo().message_post(
+                    body=_(
+                        "Se cancelo automaticamente la orden de cocina %s "
+                        "al cancelar el pedido delivery."
+                    ) % kitchen_order.name,
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_note",
+                )
         return result

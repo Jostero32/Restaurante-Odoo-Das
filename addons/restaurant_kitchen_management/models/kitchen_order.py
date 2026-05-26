@@ -1,4 +1,5 @@
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 
 class RestaurantKitchenOrder(models.Model):
@@ -191,6 +192,22 @@ class RestaurantKitchenOrder(models.Model):
         })
 
     def action_cancel(self):
+        # Avisar al delivery si la orden cancelada provenia de uno: el
+        # admin/repartidor necesita saber que cocina ya no va a preparar.
+        for order in self:
+            delivery = order.delivery_order_id
+            if delivery and delivery.state not in ("delivered", "cancelled"):
+                delivery.sudo().message_post(
+                    body=_(
+                        "Cocina cancelo la orden %s. "
+                        "Revise el pedido antes de continuar el despacho."
+                    ) % order.name,
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_comment",
+                )
+                # Si el delivery aun tenia kitchen_ready, lo desmarcamos.
+                if delivery.kitchen_ready:
+                    delivery.sudo().write({"kitchen_ready": False})
         self.write({"state": "cancelled"})
 
     # ------------------------------------------------------------------
@@ -308,6 +325,17 @@ class RestaurantKitchenOrder(models.Model):
         } for o in orders]
 
     def mark_served_from_pos(self):
-        """Wrapper para llamar action_served desde el POS via RPC."""
+        """Wrapper para llamar action_served desde el POS via RPC.
+
+        Solo permitido para ordenes con origen POS o manual: las ordenes
+        de delivery NO se sirven (se despachan al repartidor), por lo que
+        deben cerrarse desde el backend con el boton "Marcar Despachada".
+        """
+        invalid = self.filtered(lambda o: o.origin_type == "delivery")
+        if invalid:
+            raise UserError(_(
+                "No se puede marcar como servida una orden de delivery desde el POS. "
+                "Use el boton 'Marcar Despachada' en el backend."
+            ))
         self.action_served()
         return True

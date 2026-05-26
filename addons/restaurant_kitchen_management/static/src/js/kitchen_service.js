@@ -36,15 +36,28 @@ export const kitchenService = {
         const readyListeners = new Set();
 
         function _indexOrders(orders) {
-            state.orders = orders;
-            state.readyOrders = orders.filter((o) => o.state === "ready");
-            const byTable = {};
+            // Mutar in-place para preservar las referencias de los objetos
+            // reactivos. Si reasignamos `state.orders = ...` los componentes
+            // que hicieron useState sobre una sub-propiedad pueden no
+            // re-renderizar.
+            state.orders.splice(0, state.orders.length, ...orders);
+            state.readyOrders.splice(
+                0,
+                state.readyOrders.length,
+                ...orders.filter((o) => o.state === "ready"),
+            );
+
+            // Limpiar byTable manteniendo la misma referencia de objeto.
+            for (const key of Object.keys(state.byTable)) {
+                delete state.byTable[key];
+            }
             for (const o of orders) {
                 if (!o.table_id) continue;
-                if (!byTable[o.table_id]) byTable[o.table_id] = [];
-                byTable[o.table_id].push(o);
+                if (!state.byTable[o.table_id]) {
+                    state.byTable[o.table_id] = [];
+                }
+                state.byTable[o.table_id].push(o);
             }
-            state.byTable = byTable;
             state.lastRefresh = Date.now();
 
             // Detectar ordenes que pasaron a ready desde el ultimo refresh
