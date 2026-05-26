@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Herencia de la vista form de product.template para mostrar
+         el campo kitchen_preparable en la pestaña "Ventas" -->
+    <record id="product_template_form_view_kitchen_info" model="ir.ui.view">
+        <field name="name">product.template.form.kitchen.info</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='sales']/group/group[@name='description']" position="after">
+                <group string="Gestión de Cocina">
+                    <field name="kitchen_preparable"
+                           widget="boolean_toggle"
+                           help="Activa esta opción para que el producto
+                                 aparezca disponible en las órdenes de cocina."/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

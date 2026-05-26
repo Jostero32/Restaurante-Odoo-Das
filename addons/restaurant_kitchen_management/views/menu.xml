@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Menú raíz "Cocina" — hijo del menú principal del restaurante -->
+    <menuitem
+        id="menu_restaurant_kitchen_root"
+        name="Cocina"
+        parent="restaurant_casa_vieja_base.menu_restaurant_casa_vieja_root"
+        groups="restaurant_casa_vieja_base.group_restaurant_cocinero,
+                restaurant_casa_vieja_base.group_restaurant_mesero,
+                restaurant_casa_vieja_base.group_restaurant_administracion,
+                restaurant_casa_vieja_base.group_restaurant_administrador"
+        sequence="10"/>
+
+    <!-- Pantalla principal: vista Kanban de órdenes de cocina -->
+    <menuitem
+        id="menu_restaurant_kitchen_orders"
+        name="Órdenes de Cocina"
+        parent="menu_restaurant_kitchen_root"
+        action="action_restaurant_kitchen_orders"
+        groups="restaurant_casa_vieja_base.group_restaurant_cocinero,
+                restaurant_casa_vieja_base.group_restaurant_mesero,
+                restaurant_casa_vieja_base.group_restaurant_administracion,
+                restaurant_casa_vieja_base.group_restaurant_administrador"
+        sequence="10"/>
+
+</odoo>

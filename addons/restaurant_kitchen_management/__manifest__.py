@@ -32,10 +32,9 @@ las órdenes de preparación:
     'data': [
         'data/kitchen_sequence.xml',
         'security/ir.model.access.csv',
-        # Se agregarán en la Tarea 10:
-        # 'views/kitchen_order_views.xml',
-        # 'views/product_views.xml',
-        # 'views/menu.xml',
+        'views/kitchen_order_views.xml',
+        'views/product_views.xml',
+        'views/menu.xml',
     ],
 
     'installable': True,
