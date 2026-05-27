@@ -31,6 +31,11 @@ class RestaurantDeliveryOrder(models.Model):
         tracking=True,
     )
     eta_minutes = fields.Integer(string="ETA minutos", default=35, tracking=True)
+    estimated_delivery_datetime = fields.Datetime(
+        string="Estimated delivery datetime",
+        compute="_compute_estimated_delivery_datetime",
+        store=True,
+    )
     amount_total = fields.Monetary(string="Total", currency_field="currency_id", tracking=True)
     company_id = fields.Many2one(
         "res.company",
@@ -43,6 +48,14 @@ class RestaurantDeliveryOrder(models.Model):
         string="Moneda",
         default=lambda self: self.env.company.currency_id,
         required=True,
+    )
+    delivery_user_id = fields.Many2one("res.users", string="Repartidor", tracking=True)
+    driver_id = fields.Many2one(
+        "res.users",
+        string="Repartidor",
+        related="delivery_user_id",
+        readonly=False,
+        store=False,
     )
     notes = fields.Text(string="Notas")
     state = fields.Selection(
@@ -678,3 +691,22 @@ class RestaurantDeliveryOrder(models.Model):
         if delivered:
             raise UserError(_("No puede cancelar un pedido entregado."))
         self.write({"state": "cancelled"})
+
+    @api.depends('order_datetime', 'eta_minutes')
+    def _compute_estimated_delivery_datetime(self):
+        for order in self:
+            if order.order_datetime and order.eta_minutes is not None:
+                try:
+                    # order_datetime is a datetime string in UTC-aware fields
+                    order_dt = fields.Datetime.from_string(order.order_datetime)
+                except Exception:
+                    order.estimated_delivery_datetime = False
+                    continue
+                # add minutes
+                from datetime import timedelta
+
+                order.estimated_delivery_datetime = fields.Datetime.to_string(
+                    order_dt + timedelta(minutes=order.eta_minutes)
+                )
+            else:
+                order.estimated_delivery_datetime = False

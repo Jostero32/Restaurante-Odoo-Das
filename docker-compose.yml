@@ -102,6 +102,7 @@ services:
       - ./addons:/mnt/extra-addons
       - ./backups:/backups
       - ./scripts:/scripts
+    command: ["-u", "restaurant_table_reservations", "-d", "odoo"]
     restart: always
 
   backup:
