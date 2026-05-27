@@ -28,16 +28,38 @@
                             <form action="/reservas/create" method="post" class="o_reservation_form" id="reservation_form">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                 <input type="hidden" name="table_id" id="table_id" t-att-value="selected_table_id or ''"/>
+                                <input t-if="reschedule_from" type="hidden" name="reschedule_from" t-att-value="reschedule_from"/>
+
+                                <div t-if="reschedule_from" class="alert alert-warning d-flex justify-content-between align-items-center gap-2 mb-3">
+                                    <div>
+                                        <strong>Estas reprogramando la reserva <t t-out="reschedule_source_name"/>.</strong>
+                                        Al guardar, la reserva anterior se cancela y se crea una nueva con los datos elegidos.
+                                    </div>
+                                    <a href="/my/reservations" class="btn btn-sm btn-outline-secondary">Cancelar cambio</a>
+                                </div>
+
+                                <t t-set="logged_partner" t-value="user_id.partner_id.commercial_partner_id"/>
+                                <t t-set="partner_phone" t-value="logged_partner.phone or logged_partner.mobile or ''"/>
+                                <div class="alert alert-light border rounded-3 d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                    <div>
+                                        <div class="text-muted small">Reservando como</div>
+                                        <div class="fw-semibold" t-out="logged_partner.name"/>
+                                        <div class="small text-muted">
+                                            <t t-if="partner_phone">
+                                                <i class="fa fa-phone me-1"/><t t-out="partner_phone"/>
+                                            </t>
+                                            <t t-else="">
+                                                <span class="text-warning"><i class="fa fa-exclamation-triangle me-1"/>Sin telefono en tu perfil. Agregalo desde
+                                                    <a href="/my/account">Mi cuenta</a> para que el restaurante pueda contactarte.</span>
+                                            </t>
+                                        </div>
+                                    </div>
+                                    <a href="/my/account" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fa fa-pencil me-1"/>Cambiar mis datos
+                                    </a>
+                                </div>
 
                                 <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label" for="customer_name">Nombre *</label>
-                                        <input id="customer_name" name="customer_name" class="form-control" required="required" t-att-value="customer_name" maxlength="50" pattern="[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+" title="Solo se permiten letras y espacios" oninput="this.value = this.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');"/>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label" for="customer_phone">Teléfono</label>
-                                        <input id="customer_phone" name="customer_phone" class="form-control" t-att-value="customer_phone" type="tel" pattern="[0-9]{10}" maxlength="10" minlength="10" oninput="this.value = this.value.replace(/[^0-9]/g, '');" title="Ingrese exactamente 10 dígitos numéricos" required="required"/>
-                                    </div>
                                     <div class="col-md-4">
                                         <label class="form-label" for="party_size">Personas *</label>
                                         <input id="party_size" name="party_size" type="number" min="1" max="20" step="1" class="form-control" required="required" t-att-value="selected_party_size" oninput="this.value = this.value.replace(/[^0-9]/g, '');"/>

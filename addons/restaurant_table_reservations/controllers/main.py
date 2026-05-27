@@ -44,6 +44,24 @@ class RestaurantTableReservationController(http.Controller):
         naive_dt = datetime.strptime(f"{date_value} {time_value}", "%Y-%m-%d %H:%M")
         return self._local_to_utc(naive_dt)
 
+    def _resolve_reschedule_source(self, reschedule_from):
+        if not reschedule_from:
+            return None
+        try:
+            source_id = int(reschedule_from)
+        except (TypeError, ValueError):
+            return None
+        partner = request.env.user.partner_id.commercial_partner_id
+        source = request.env["restaurant.table.reservation"].sudo().search(
+            [
+                ("id", "=", source_id),
+                ("partner_id", "child_of", [partner.id]),
+                ("state", "in", ("draft", "confirmed")),
+            ],
+            limit=1,
+        )
+        return source or None
+
     def _build_context(self, **kwargs):
         reservation_model = request.env["restaurant.table.reservation"].sudo()
         zone = kwargs.get("zone") or "main"
@@ -76,8 +94,17 @@ class RestaurantTableReservationController(http.Controller):
             "reservation_buffer_minutes": reservation_model.BUFFER_MINUTES,
         }
 
-    @http.route(["/reservas", "/reservas/mesa"], type="http", auth="public", website=True, sitemap=True)
+    @http.route(["/reservas", "/reservas/mesa"], type="http", auth="user", website=True, sitemap=True)
     def reservation_page(self, **kwargs):
+        source = self._resolve_reschedule_source(kwargs.get("reschedule_from"))
+        if source:
+            local_start = fields.Datetime.context_timestamp(source, source.start_datetime)
+            kwargs.setdefault("date", local_start.date().isoformat())
+            kwargs.setdefault("time", local_start.strftime("%H:%M"))
+            kwargs.setdefault("zone", source.zone)
+            kwargs.setdefault("party_size", str(source.party_size))
+            kwargs.setdefault("arrangement_type", source.arrangement_type or "none")
+            kwargs.setdefault("notes", source.notes or "")
         context = self._build_context(**kwargs)
         context.update(
             {
@@ -87,11 +114,13 @@ class RestaurantTableReservationController(http.Controller):
                 "customer_name": kwargs.get("customer_name") or "",
                 "customer_phone": kwargs.get("customer_phone") or "",
                 "notes": kwargs.get("notes") or "",
+                "reschedule_from": source.id if source else False,
+                "reschedule_source_name": source.name if source else "",
             }
         )
         return request.render("restaurant_table_reservations.reservation_page", context)
 
-    @http.route("/reservas/availability", type="http", auth="public", website=True, methods=["GET"], csrf=False)
+    @http.route("/reservas/availability", type="http", auth="user", website=True, methods=["GET"], csrf=False)
     def reservation_availability(self, **kwargs):
         context = self._build_context(**kwargs)
         payload = {
@@ -119,21 +148,25 @@ class RestaurantTableReservationController(http.Controller):
         }
         return request.make_response(json.dumps(payload), headers=[("Content-Type", "application/json")])
 
-    @http.route("/reservas/create", type="http", auth="public", website=True, methods=["POST"], csrf=True)
+    @http.route("/reservas/create", type="http", auth="user", website=True, methods=["POST"], csrf=True)
     def reservation_create(self, **post):
         start_datetime = self._parse_start_datetime(post.get("date"), post.get("time"))
         if not start_datetime:
             return request.redirect("/reservas?error=Debes seleccionar una fecha y una hora.")
+
+        source = self._resolve_reschedule_source(post.get("reschedule_from"))
 
         try:
             table_id = self._safe_int(post.get("table_id"), 0)
             if not table_id:
                 raise ValidationError(_("Debes elegir una mesa disponible."))
 
+            partner = request.env.user.partner_id.commercial_partner_id
             reservation_model = request.env["restaurant.table.reservation"].sudo()
             reservation_vals = {
-                "customer_name": post.get("customer_name") or "",
-                "customer_phone": post.get("customer_phone") or "",
+                "partner_id": partner.id,
+                "customer_name": post.get("customer_name") or partner.name or "",
+                "customer_phone": post.get("customer_phone") or partner.phone or partner.mobile or "",
                 "party_size": int(post.get("party_size") or 2),
                 "zone": post.get("zone") or "main",
                 "table_id": table_id,
@@ -141,8 +174,11 @@ class RestaurantTableReservationController(http.Controller):
                 "notes": post.get("notes") or "",
                 "arrangement_type": post.get("arrangement_type") or "none",
             }
+            if source:
+                source.action_cancel()
             reservation_model.create(reservation_vals)
         except (ValidationError, ValueError) as error:
             return request.redirect(f"/reservas?error={quote_plus(str(error))}")
 
-        return request.redirect("/reservas?success=1")
+        suffix = "rescheduled=1" if source else "success=1"
+        return request.redirect(f"/my/reservations?{suffix}")

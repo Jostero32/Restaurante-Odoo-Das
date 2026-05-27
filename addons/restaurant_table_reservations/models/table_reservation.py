@@ -19,6 +19,13 @@ class RestaurantTableReservation(models.Model):
     BUFFER_MINUTES = 15
 
     name = fields.Char(string="Referencia", required=True, default=lambda self: _("Nueva reserva"), copy=False)
+    partner_id = fields.Many2one(
+        "res.partner",
+        string="Cuenta del cliente",
+        tracking=True,
+        index=True,
+        help="Usuario portal que creo la reserva. Permite acceso desde Mis Reservas.",
+    )
     customer_name = fields.Char(string="Cliente", required=True, tracking=True)
     customer_phone = fields.Char(string="Telefono", tracking=True)
     party_size = fields.Integer(string="Personas", required=True, default=2, tracking=True)
@@ -249,7 +256,66 @@ class RestaurantTableReservation(models.Model):
                 self._validate_requested_start_datetime(fields.Datetime.to_datetime(vals["start_datetime"]))
             if vals.get("arrangement_type"):
                 vals["arrangement_type"] = vals["arrangement_type"] or "none"
-        return super().create(synced_vals_list)
+        reservations = super().create(synced_vals_list)
+        if not self.env.context.get("skip_reservation_internal_notify"):
+            reservations._notify_internal_new_reservation()
+        return reservations
+
+    def _notify_internal_new_reservation(self):
+        web_reservations = self.filtered(lambda r: r.partner_id)
+        if not web_reservations:
+            return
+        todo_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+        if not todo_type:
+            return
+        users = self.env["res.users"]
+        for group_xmlid in [
+            "restaurant_casa_vieja_base.group_restaurant_mesero",
+            "restaurant_casa_vieja_base.group_restaurant_administracion",
+            "restaurant_casa_vieja_base.group_restaurant_administrador",
+        ]:
+            group = self.env.ref(group_xmlid, raise_if_not_found=False)
+            if group:
+                users |= group.sudo().users.filtered(lambda u: u.active and not u.share)
+        if not users:
+            return
+        model_id = self.env["ir.model"]._get_id("restaurant.table.reservation")
+        activity_vals = []
+        for reservation in web_reservations:
+            deadline = fields.Date.to_date(reservation.start_datetime) if reservation.start_datetime else fields.Date.context_today(self)
+            zone_label = dict(self._fields["zone"].selection).get(reservation.zone, reservation.zone)
+            arrangement_label = self._get_arrangement_label(reservation.arrangement_type)
+            summary = _("Nueva reserva web: %(name)s (%(party)s pers, mesa %(table)s)") % {
+                "name": reservation.customer_name,
+                "party": reservation.party_size,
+                "table": reservation.table_id.table_number or "-",
+            }
+            note = _(
+                "Reserva %(ref)s para el %(when)s en %(zone)s. Arreglo: %(arrangement)s. Telefono: %(phone)s."
+            ) % {
+                "ref": reservation.name,
+                "when": fields.Datetime.to_string(reservation.start_datetime),
+                "zone": zone_label,
+                "arrangement": arrangement_label,
+                "phone": reservation.customer_phone or _("sin telefono"),
+            }
+            reservation.sudo().message_post(
+                body=_("Nueva reserva web recibida desde el portal. Revisar agenda y arreglo si aplica."),
+                message_type="comment",
+                subtype_xmlid="mail.mt_note",
+            )
+            for user in users:
+                activity_vals.append({
+                    "activity_type_id": todo_type.id,
+                    "res_model_id": model_id,
+                    "res_id": reservation.id,
+                    "user_id": user.id,
+                    "summary": summary,
+                    "note": note,
+                    "date_deadline": deadline,
+                })
+        if activity_vals:
+            self.env["mail.activity"].sudo().create(activity_vals)
 
     def write(self, vals):
         if vals.get("start_datetime"):
@@ -307,7 +373,9 @@ class RestaurantTableReservation(models.Model):
         active = self.filtered(lambda reservation: reservation.state in ("seated", "done"))
         if active:
             raise UserError(_("No puede cancelar una reserva sentada o finalizada."))
-        self.write({"state": "cancelled"})
+        self.write({"state": "cancelled", "arrangement_charged": False})
+        for reservation in self:
+            reservation.activity_ids.filtered(lambda a: a.res_model == "restaurant.table.reservation").unlink()
         self._notify_pos_reservation_change()
 
     def _notify_pos_reservation_change(self, table_ids=None):

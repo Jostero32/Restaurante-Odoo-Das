@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="portal_my_home_menu_reservation" name="Portal breadcrumbs reservation" inherit_id="portal.portal_breadcrumbs" priority="36">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name == 'reservation'" t-attf-class="breadcrumb-item #{'active ' if not reservation else ''}">
+                <a t-if="reservation" t-attf-href="/my/reservations?{{ keep_query() }}">Mis reservas</a>
+                <t t-else="">Mis reservas</t>
+            </li>
+            <li t-if="reservation" class="breadcrumb-item active">
+                <t t-out="reservation.name"/>
+            </li>
+        </xpath>
+    </template>
+
+    <template id="portal_my_home_reservation" name="Portal card reservation" inherit_id="portal.portal_my_home" priority="36" customize_show="True">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="icon" t-value="'/web/static/img/calendar.png'"/>
+                <t t-set="title">Mis reservas</t>
+                <t t-set="url" t-value="'/my/reservations'"/>
+                <t t-set="text">Consulta y administra tus reservas de mesa</t>
+                <t t-set="placeholder_count" t-value="'reservation_count'"/>
+            </t>
+        </div>
+    </template>
+
+    <template id="portal_my_reservations" name="Portal - Mis reservas">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Mis reservas</t>
+            </t>
+
+            <div t-if="success_message" class="alert alert-success" role="alert">
+                <t t-out="success_message"/>
+            </div>
+            <div t-if="cancel_message" class="alert alert-secondary" role="alert">
+                <t t-out="cancel_message"/>
+            </div>
+            <div t-if="rescheduled_message" class="alert alert-info" role="alert">
+                <t t-out="rescheduled_message"/>
+            </div>
+
+            <t t-if="not reservation_rows">
+                <div class="alert alert-light border d-flex justify-content-between align-items-center" role="alert">
+                    <span>Aun no tienes reservas en esta categoria.</span>
+                    <a href="/reservas" class="btn btn-primary btn-sm">Reservar mesa</a>
+                </div>
+            </t>
+
+            <div t-if="reservation_rows" class="row g-3">
+                <t t-foreach="reservation_rows" t-as="row">
+                    <t t-set="reservation" t-value="row.get('record')"/>
+                    <div class="col-12 col-xl-6">
+                        <article class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                                    <div>
+                                        <h5 class="mb-1 text-dark" t-out="reservation.name"/>
+                                        <p class="mb-0 text-muted small">
+                                            <i class="fa fa-clock-o me-1"/>
+                                            <span t-field="reservation.start_datetime" t-options="{'widget': 'datetime'}"/>
+                                        </p>
+                                    </div>
+                                    <span t-attf-class="badge rounded-pill text-bg-#{row.get('state_class')}">
+                                        <t t-out="row.get('state_label')"/>
+                                    </span>
+                                </div>
+                                <div class="row g-2 mt-3 small">
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-muted">Personas</div>
+                                        <div class="fw-semibold"><t t-out="reservation.party_size"/></div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-muted">Zona</div>
+                                        <div class="fw-semibold">
+                                            <t t-if="reservation.zone == 'main'">Interior</t>
+                                            <t t-if="reservation.zone == 'patio'">Patio</t>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-muted">Mesa</div>
+                                        <div class="fw-semibold">
+                                            <t t-out="reservation.table_id.table_number or '-'"/>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="text-muted">Arreglo</div>
+                                        <div class="fw-semibold small" t-out="reservation._get_arrangement_label(reservation.arrangement_type)"/>
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 mt-3">
+                                    <a t-att-href="row.get('detail_url')" class="btn btn-outline-dark btn-sm">
+                                        <i class="fa fa-eye me-1"/>Ver detalle
+                                    </a>
+                                    <a t-if="row.get('can_cancel')"
+                                       t-attf-href="/reservas?reschedule_from=#{reservation.id}"
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="fa fa-pencil me-1"/>Cambiar fecha/hora
+                                    </a>
+                                    <form t-if="row.get('can_cancel')"
+                                          t-attf-action="/my/reservations/#{reservation.id}/cancel"
+                                          method="post" class="m-0">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <button type="submit"
+                                                class="btn btn-outline-danger btn-sm"
+                                                onclick="return confirm('¿Cancelar esta reserva?');">
+                                            <i class="fa fa-times me-1"/>Cancelar
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_my_reservation_page" name="Portal - Detalle de reserva">
+        <t t-call="portal.portal_layout">
+            <section class="my-3">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                            <div>
+                                <h3 class="mb-1 text-dark" t-out="reservation.name"/>
+                                <p class="mb-0 text-muted">
+                                    <i class="fa fa-clock-o me-1"/>
+                                    <span t-field="reservation.start_datetime" t-options="{'widget': 'datetime'}"/>
+                                    a
+                                    <span t-field="reservation.end_datetime" t-options="{'widget': 'datetime'}"/>
+                                </p>
+                            </div>
+                            <span t-attf-class="badge rounded-pill text-bg-#{state_class} fs-6 px-3 py-2">
+                                <t t-out="state_label"/>
+                            </span>
+                        </div>
+
+                        <div t-if="cancel_error == 'state'" class="alert alert-warning mt-3 mb-0 py-2 px-3 small">
+                            Esta reserva ya no se puede cancelar desde el portal porque ya esta en curso o finalizada.
+                        </div>
+                        <div t-if="cancel_error == 'blocked'" class="alert alert-danger mt-3 mb-0 py-2 px-3 small">
+                            No se pudo cancelar la reserva. Contacta al restaurante.
+                        </div>
+
+                        <div class="row g-2 mt-3">
+                            <div class="col-12 col-md-6">
+                                <div class="border rounded-3 p-3 bg-white">
+                                    <div class="text-muted small">Cliente</div>
+                                    <div class="fw-semibold" t-out="reservation.customer_name"/>
+                                    <div class="text-muted small mt-2">Telefono</div>
+                                    <div class="fw-semibold" t-out="reservation.customer_phone or 'Sin telefono'"/>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <div class="border rounded-3 p-3 bg-white">
+                                    <div class="text-muted small">Personas</div>
+                                    <div class="fw-semibold" t-out="reservation.party_size"/>
+                                    <div class="text-muted small mt-2">Zona y mesa</div>
+                                    <div class="fw-semibold">
+                                        <t t-if="reservation.zone == 'main'">Interior</t>
+                                        <t t-if="reservation.zone == 'patio'">Patio</t>
+                                        — Mesa <t t-out="reservation.table_id.table_number or '-'"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="border rounded-3 p-3 bg-white">
+                                    <div class="text-muted small">Arreglo especial</div>
+                                    <div class="fw-semibold" t-out="reservation._get_arrangement_label(reservation.arrangement_type)"/>
+                                    <t t-if="reservation.notes">
+                                        <div class="text-muted small mt-2">Notas</div>
+                                        <div t-out="reservation.notes"/>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 mt-3">
+                            <a href="/my/reservations" class="btn btn-outline-secondary">
+                                <i class="fa fa-arrow-left me-1"/>Volver a mis reservas
+                            </a>
+                            <a t-if="can_cancel"
+                               t-attf-href="/reservas?reschedule_from=#{reservation.id}"
+                               class="btn btn-primary">
+                                <i class="fa fa-pencil me-1"/>Cambiar fecha/hora
+                            </a>
+                            <form t-if="can_cancel"
+                                  t-attf-action="/my/reservations/#{reservation.id}/cancel"
+                                  method="post" class="m-0">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit"
+                                        class="btn btn-outline-danger"
+                                        onclick="return confirm('¿Cancelar esta reserva?');">
+                                    <i class="fa fa-times me-1"/>Cancelar reserva
+                                </button>
+                            </form>
+                            <a t-if="not can_cancel" href="/reservas" class="btn btn-primary">
+                                <i class="fa fa-calendar-plus-o me-1"/>Nueva reserva
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </t>
+    </template>
+</odoo>

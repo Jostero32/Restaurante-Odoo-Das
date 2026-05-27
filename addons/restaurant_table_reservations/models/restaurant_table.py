@@ -36,18 +36,23 @@ class RestaurantTable(models.Model):
                 table.zone = False
 
     def _search_zone(self, operator, value):
-        """Allow domain filters like [('zone', '=', 'main')]."""
+        """Allow domain filters like [('zone', '=', 'main')] or [('zone', 'in', ['main','patio'])]."""
+        if isinstance(value, (list, tuple, set)):
+            wanted_zones = set(value)
+        else:
+            wanted_zones = {value}
+
         floors = self.env["restaurant.floor"].sudo().search([])
         floor_ids = []
         for floor in floors:
             fname = (floor.name or "").strip().lower()
-            if value == "main" and "interior" in fname:
+            if "interior" in fname and "main" in wanted_zones:
                 floor_ids.append(floor.id)
-            elif value == "patio" and "patio" in fname:
+            elif "patio" in fname and "patio" in wanted_zones:
                 floor_ids.append(floor.id)
         if operator in ("=", "in"):
             return [("floor_id", "in", floor_ids)]
-        elif operator in ("!=", "not in"):
+        if operator in ("!=", "not in"):
             return [("floor_id", "not in", floor_ids)]
         return [("floor_id", "in", floor_ids)]
 
@@ -109,23 +114,6 @@ class RestaurantTable(models.Model):
                 [("default_code", "=", code_map.get(reservation.arrangement_type or "", ""))],
                 limit=1,
             )
-            # If product not found, create a product.template + variant so POS can reference it later
-            if not product and reservation.arrangement_type and reservation.arrangement_type != 'none':
-                code = code_map.get(reservation.arrangement_type or "", "")
-                try:
-                    tmpl_vals = {
-                        'name': reservation._get_arrangement_label(reservation.arrangement_type),
-                        'default_code': code,
-                        'type': 'service',
-                        'list_price': arrangement_price,
-                        'sale_ok': True,
-                        'base_unit_count': 1.0,
-                    }
-                    tmpl = self.env['product.template'].sudo().create(tmpl_vals)
-                    # product.product variant will be created automatically; get it
-                    product = tmpl.product_variant_id
-                except Exception:
-                    product = False
             snapshot[reservation.table_id.id] = {
                 "reservation_id": reservation.id,
                 "table_id": reservation.table_id.id,
@@ -143,56 +131,47 @@ class RestaurantTable(models.Model):
 
     @api.model
     def mark_reservation_charged_for_table(self, table_id):
-        """Mark the active reservation for a table as having its arrangement charged.
+        """Inject the arrangement line into the open POS order for the table.
 
-        Returns True if a reservation was found and marked, False otherwise.
+        Only touches POS orders in 'draft' state to avoid contaminating
+        finalized/invoiced orders. Returns True if reservation was found.
         """
         reservation = self._get_active_reservation_for_table(table_id)
-        if reservation:
-            # Attempt to attach the arrangement as a POS order line if a matching POS order exists
-            try:
-                code_map = {
-                    "birthday": "ARR-BIRTHDAY",
-                    "anniversary": "ARR-ANNIV",
-                    "romantic": "ARR-ROMANTIC",
-                    "general": "ARR-GENERAL",
-                }
-                default_code = code_map.get(reservation.arrangement_type or "", "")
-                product = False
-                if default_code:
-                    product = self.env["product.product"].sudo().search([("default_code", "=", default_code)], limit=1)
+        if not reservation:
+            return False
 
-                arrangement_price = reservation._get_arrangement_cost()
+        code_map = {
+            "birthday": "ARR-BIRTHDAY",
+            "anniversary": "ARR-ANNIV",
+            "romantic": "ARR-ROMANTIC",
+            "general": "ARR-GENERAL",
+        }
+        default_code = code_map.get(reservation.arrangement_type or "", "")
+        product = (
+            self.env["product.product"].sudo().search([("default_code", "=", default_code)], limit=1)
+            if default_code
+            else self.env["product.product"]
+        )
 
-                # Find a recent POS order for this table that is in a post-payment state (paid/done)
-                # Prefer the most recent POS order for this table regardless of its state
-                pos_order = self.env["pos.order"].sudo().search(
-                    [("table_id", "=", table_id)],
-                    order="id desc",
-                    limit=1,
-                )
+        open_pos_order = self.env["pos.order"].sudo().search(
+            [("table_id", "=", table_id), ("state", "=", "draft")],
+            order="id desc",
+            limit=1,
+        )
 
-                if pos_order and product:
-                    # Create a POS order line referencing the arrangement product so it appears on receipts/invoices
-                    line_vals = {
-                        "order_id": pos_order.id,
-                        "product_id": product.id,
-                        "qty": 1.0,
-                        "price_unit": arrangement_price,
-                    }
-                    try:
-                        self.env["pos.order.line"].sudo().create(line_vals)
-                    except Exception:
-                        # best-effort: don't fail the whole flow if line creation fails
-                        pass
-            except Exception:
-                # swallow unexpected errors from the best-effort attachment
-                pass
+        if open_pos_order and product:
+            already = open_pos_order.lines.filtered(lambda l: l.product_id.id == product.id)
+            if not already:
+                self.env["pos.order.line"].sudo().create({
+                    "order_id": open_pos_order.id,
+                    "product_id": product.id,
+                    "qty": 1.0,
+                    "price_unit": reservation._get_arrangement_cost(),
+                })
 
-            reservation.sudo().write({"arrangement_charged": True})
-            reservation._notify_pos_reservation_change([reservation.table_id.id])
-            return True
-        return False
+        reservation.sudo().write({"arrangement_charged": True})
+        reservation._notify_pos_reservation_change([reservation.table_id.id])
+        return True
 
     @api.model
     def finalize_pos_reservation_for_table(self, table_id):
