@@ -89,7 +89,14 @@
                                     </div>
                                     <div class="col-6 col-md-3">
                                         <div class="text-muted">Arreglo</div>
-                                        <div class="fw-semibold small" t-out="reservation._get_arrangement_label(reservation.arrangement_type)"/>
+                                        <div class="fw-semibold small">
+                                            <t t-if="reservation.arrangement_product_id">
+                                                <t t-out="reservation.arrangement_product_id.name"/>
+                                            </t>
+                                            <t t-else="">
+                                                <t t-out="reservation._get_arrangement_label(reservation.arrangement_type)"/>
+                                            </t>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="d-flex flex-wrap gap-2 mt-3">
@@ -171,7 +178,14 @@
                             <div class="col-12">
                                 <div class="border rounded-3 p-3 bg-white">
                                     <div class="text-muted small">Arreglo especial</div>
-                                    <div class="fw-semibold" t-out="reservation._get_arrangement_label(reservation.arrangement_type)"/>
+                                    <div class="fw-semibold">
+                                        <t t-if="reservation.arrangement_product_id">
+                                            <t t-out="reservation.arrangement_product_id.name"/>
+                                        </t>
+                                        <t t-else="">
+                                            <t t-out="reservation._get_arrangement_label(reservation.arrangement_type)"/>
+                                        </t>
+                                    </div>
                                     <t t-if="reservation.notes">
                                         <div class="text-muted small mt-2">Notas</div>
                                         <div t-out="reservation.notes"/>

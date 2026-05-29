@@ -83,12 +83,13 @@
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label" for="arrangement_type">Arreglo Especial para la mesa</label>
-                                        <select id="arrangement_type" name="arrangement_type" class="form-select">
-                                            <option value="none" t-att-selected="selected_arrangement_type == 'none' and 'selected' or None">Ninguno</option>
-                                            <option value="birthday" t-att-selected="selected_arrangement_type == 'birthday' and 'selected' or None">Decoración Cumpleaños +$10.00</option>
-                                            <option value="anniversary" t-att-selected="selected_arrangement_type == 'anniversary' and 'selected' or None">Decoración Aniversario +$15.00</option>
-                                            <option value="romantic" t-att-selected="selected_arrangement_type == 'romantic' and 'selected' or None">Cita Romántica +$20.00</option>
-                                            <option value="general" t-att-selected="selected_arrangement_type == 'general' and 'selected' or None">Arreglo Especial +$5.00</option>
+                                        <select id="arrangement_product_id" name="arrangement_product_id" class="form-select">
+                                            <option value="0" t-att-selected="not selected_arrangement_product_id and 'selected' or None">Ninguno</option>
+                                            <t t-foreach="arrangement_options" t-as="opt">
+                                                <option t-att-value="opt['id']" t-att-selected="selected_arrangement_product_id == opt['id'] and 'selected' or None">
+                                                    <t t-esc="opt['label']"/>
+                                                </option>
+                                            </t>
                                         </select>
                                         <small class="text-primary mt-1 d-block">El costo del arreglo se añadirá a su cuenta final en el restaurante.</small>
                                     </div>

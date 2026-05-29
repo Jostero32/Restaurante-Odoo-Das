@@ -86,7 +86,8 @@ class RestaurantTableReservationController(http.Controller):
             "selected_party_size": party_size,
             "selected_date": kwargs.get("date") or "",
             "selected_time": kwargs.get("time") or "",
-            "selected_arrangement_type": kwargs.get("arrangement_type") or "none",
+            "selected_arrangement_product_id": self._safe_int(kwargs.get("arrangement_product_id"), 0),
+            "arrangement_options": reservation_model._get_arrangement_products(),
             "available_time_options": reservation_model._get_time_options(kwargs.get("date")),
             "available_tables": available_tables,
             "reservation_window_end": reservation_window_end,
@@ -103,7 +104,7 @@ class RestaurantTableReservationController(http.Controller):
             kwargs.setdefault("time", local_start.strftime("%H:%M"))
             kwargs.setdefault("zone", source.zone)
             kwargs.setdefault("party_size", str(source.party_size))
-            kwargs.setdefault("arrangement_type", source.arrangement_type or "none")
+            kwargs.setdefault("arrangement_product_id", str(source.arrangement_product_id.id) if source.arrangement_product_id else "0")
             kwargs.setdefault("notes", source.notes or "")
         context = self._build_context(**kwargs)
         context.update(
@@ -163,6 +164,7 @@ class RestaurantTableReservationController(http.Controller):
 
             partner = request.env.user.partner_id.commercial_partner_id
             reservation_model = request.env["restaurant.table.reservation"].sudo()
+            arrangement_product_id = self._safe_int(post.get("arrangement_product_id"), 0)
             reservation_vals = {
                 "partner_id": partner.id,
                 "customer_name": post.get("customer_name") or partner.name or "",
@@ -172,11 +174,12 @@ class RestaurantTableReservationController(http.Controller):
                 "table_id": table_id,
                 "start_datetime": fields.Datetime.to_string(start_datetime),
                 "notes": post.get("notes") or "",
-                "arrangement_type": post.get("arrangement_type") or "none",
+                "arrangement_product_id": arrangement_product_id or False,
             }
             if source:
                 source.action_cancel()
-            reservation_model.create(reservation_vals)
+            reservation = reservation_model.create(reservation_vals)
+            reservation.action_confirm()
         except (ValidationError, ValueError) as error:
             return request.redirect(f"/reservas?error={quote_plus(str(error))}")
 

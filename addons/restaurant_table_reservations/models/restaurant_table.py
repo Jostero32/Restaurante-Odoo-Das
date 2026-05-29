@@ -103,25 +103,37 @@ class RestaurantTable(models.Model):
         snapshot = {}
         for reservation in reservations:
             arrangement_price = reservation._get_arrangement_cost()
-            # find corresponding arrangement product by default_code
-            code_map = {
-                "birthday": "ARR-BIRTHDAY",
-                "anniversary": "ARR-ANNIV",
-                "romantic": "ARR-ROMANTIC",
-                "general": "ARR-GENERAL",
-            }
-            product = self.env["product.product"].sudo().search(
-                [("default_code", "=", code_map.get(reservation.arrangement_type or "", ""))],
-                limit=1,
+            # Prefer arrangement_product_id; fall back to legacy code_map
+            product_product = self.env["product.product"]
+            if reservation.arrangement_product_id:
+                product_product = self.env["product.product"].sudo().search(
+                    [("product_tmpl_id", "=", reservation.arrangement_product_id.id)], limit=1
+                )
+            elif reservation.arrangement_type and reservation.arrangement_type != "none":
+                code_map = {
+                    "birthday": "ARR-BIRTHDAY",
+                    "anniversary": "ARR-ANNIV",
+                    "romantic": "ARR-ROMANTIC",
+                    "general": "ARR-GENERAL",
+                }
+                code = code_map.get(reservation.arrangement_type, "")
+                if code:
+                    product_product = self.env["product.product"].sudo().search(
+                        [("default_code", "=", code)], limit=1
+                    )
+            arrangement_label = (
+                reservation._get_arrangement_label(product=reservation.arrangement_product_id)
+                if reservation.arrangement_product_id
+                else reservation._get_arrangement_label(reservation.arrangement_type)
             )
             snapshot[reservation.table_id.id] = {
                 "reservation_id": reservation.id,
                 "table_id": reservation.table_id.id,
                 "state": reservation.state,
                 "arrangement_type": reservation.arrangement_type,
-                "arrangement_label": reservation._get_arrangement_label(reservation.arrangement_type),
+                "arrangement_label": arrangement_label,
                 "arrangement_price": arrangement_price,
-                "arrangement_product_id": product.id if product else False,
+                "arrangement_product_id": product_product.id if product_product else False,
                 "arrangement_charged": bool(reservation.arrangement_charged),
                 "customer_name": reservation.customer_name,
                 "start_datetime": fields.Datetime.to_string(reservation.start_datetime),
@@ -140,18 +152,26 @@ class RestaurantTable(models.Model):
         if not reservation:
             return False
 
-        code_map = {
-            "birthday": "ARR-BIRTHDAY",
-            "anniversary": "ARR-ANNIV",
-            "romantic": "ARR-ROMANTIC",
-            "general": "ARR-GENERAL",
-        }
-        default_code = code_map.get(reservation.arrangement_type or "", "")
-        product = (
-            self.env["product.product"].sudo().search([("default_code", "=", default_code)], limit=1)
-            if default_code
-            else self.env["product.product"]
-        )
+        # Prefer arrangement_product_id; fall back to legacy code_map
+        if reservation.arrangement_product_id:
+            product = self.env["product.product"].sudo().search(
+                [("product_tmpl_id", "=", reservation.arrangement_product_id.id)], limit=1
+            )
+        elif reservation.arrangement_type and reservation.arrangement_type != "none":
+            code_map = {
+                "birthday": "ARR-BIRTHDAY",
+                "anniversary": "ARR-ANNIV",
+                "romantic": "ARR-ROMANTIC",
+                "general": "ARR-GENERAL",
+            }
+            default_code = code_map.get(reservation.arrangement_type, "")
+            product = (
+                self.env["product.product"].sudo().search([("default_code", "=", default_code)], limit=1)
+                if default_code
+                else self.env["product.product"]
+            )
+        else:
+            product = self.env["product.product"]
 
         open_pos_order = self.env["pos.order"].sudo().search(
             [("table_id", "=", table_id), ("state", "=", "draft")],
@@ -188,6 +208,11 @@ class RestaurantTable(models.Model):
         now = fields.Datetime.now()
         for table in self:
             reservation = self._get_active_reservation_for_table(table.id, reference_datetime=now)
-            table.current_arrangement = (
-                reservation._get_arrangement_label(reservation.arrangement_type) if reservation else ""
-            )
+            if not reservation:
+                table.current_arrangement = ""
+            elif reservation.arrangement_product_id:
+                table.current_arrangement = reservation._get_arrangement_label(
+                    product=reservation.arrangement_product_id
+                )
+            else:
+                table.current_arrangement = reservation._get_arrangement_label(reservation.arrangement_type)

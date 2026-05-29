@@ -87,7 +87,6 @@ function initReservationPage() {
         zone: document.getElementById("zone"),
         partySize: document.getElementById("party_size"),
         tableId: document.getElementById("table_id"),
-        phone: document.getElementById("customer_phone"),
         summary: document.getElementById("reservation_summary"),
         feedback: document.getElementById("availability_feedback"),
         windowFeedback: document.getElementById("reservation_window_feedback"),
@@ -134,16 +133,13 @@ function initReservationPage() {
         const time = fields.time.value;
         const zone = fields.zone.value;
         const partySize = fields.partySize.value || 2;
-        const arrangementTypeEl = document.getElementById('arrangement_type');
-        const arrangementType = arrangementTypeEl ? arrangementTypeEl.value : 'none';
-
         if (!date || !time) {
             fields.feedback.textContent = "Selecciona fecha y hora para ver mesas disponibles.";
             tableResults.innerHTML = "";
             return;
         }
 
-        const url = `${AVAILABILITY_URL}?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&zone=${encodeURIComponent(zone)}&party_size=${encodeURIComponent(partySize)}&arrangement_type=${encodeURIComponent(arrangementType)}`;
+        const url = `${AVAILABILITY_URL}?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&zone=${encodeURIComponent(zone)}&party_size=${encodeURIComponent(partySize)}`;
         const response = await fetch(url, { headers: { Accept: "application/json" } });
         const payload = await response.json();
 
@@ -179,10 +175,10 @@ function initReservationPage() {
         }
 
         if (fields.summary) {
+            const arrangementEl = document.getElementById('arrangement_product_id');
             let summaryText = `Duración de mesa: ${payload.reservation_duration_minutes || 60} minutos + ${payload.reservation_buffer_minutes || 15} minutos de margen.`;
-            if (arrangementType && arrangementType !== 'none') {
-                const selectedLabel = arrangementTypeEl.options[arrangementTypeEl.selectedIndex].textContent;
-                summaryText += `\nArreglo seleccionado: ${selectedLabel}`;
+            if (arrangementEl && arrangementEl.value && arrangementEl.value !== '0') {
+                summaryText += `\nArreglo seleccionado: ${arrangementEl.options[arrangementEl.selectedIndex].textContent}`;
             }
             fields.summary.textContent = summaryText;
         }
@@ -220,10 +216,6 @@ function initReservationPage() {
     form.addEventListener("submit", async function(event) {
         event.preventDefault(); 
 
-        if (fields.phone.value.length !== 10) {
-            alert('El número de teléfono debe tener exactamente 10 dígitos.');
-            return;
-        }
         if (!state.selectedTableId) {
             alert('Por favor, selecciona una mesa disponible antes de reservar.');
             return;

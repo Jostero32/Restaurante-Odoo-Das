@@ -60,13 +60,20 @@ class RestaurantTableReservation(models.Model):
     arrangement_type = fields.Selection(
         [
             ('none', 'Ninguno'),
-            ('birthday', 'Decoración Cumpleaños +$10.00'),
-            ('anniversary', 'Decoración Aniversario +$15.00'),
-            ('romantic', 'Cita Romántica +$20.00'),
-            ('general', 'Arreglo Especial +$5.00'),
+            ('birthday', 'Decoración Cumpleaños'),
+            ('anniversary', 'Decoración Aniversario'),
+            ('romantic', 'Decoración Cita Romántica'),
+            ('general', 'Decoración Normal'),
         ],
-        string="Arreglo Especial para la mesa",
+        string="Tipo de arreglo (legado)",
         default='none',
+        tracking=True,
+    )
+
+    arrangement_product_id = fields.Many2one(
+        'product.template',
+        string="Arreglo Especial para la mesa",
+        domain=[('type', '=', 'service')],
         tracking=True,
     )
 
@@ -77,15 +84,19 @@ class RestaurantTableReservation(models.Model):
     )
 
     def _get_arrangement_cost(self):
-        """Return the numeric cost for the selected arrangement type."""
-        cost_map = {
-            "none": 0.0,
-            "birthday": 10.0,
-            "anniversary": 15.0,
-            "romantic": 20.0,
-            "general": 5.0,
-        }
-        return cost_map.get(self.arrangement_type or "none", 0.0)
+        """Return the numeric cost: prefer arrangement_product_id, fallback to legacy type."""
+        if self.arrangement_product_id:
+            return self.arrangement_product_id.list_price
+        if not self.arrangement_type or self.arrangement_type == 'none':
+            return 0.0
+        default_code = self._ARRANGEMENT_CODE_MAP.get(self.arrangement_type)
+        if default_code:
+            product = self.env['product.template'].sudo().search(
+                [('default_code', '=', default_code)], limit=1
+            )
+            if product:
+                return product.list_price
+        return 0.0
 
     # ------------------------------------------------------------------
     # Onchange helpers
@@ -114,27 +125,84 @@ class RestaurantTableReservation(models.Model):
     def _get_end_datetime(self, start_datetime):
         return start_datetime + timedelta(minutes=self.RESERVATION_MINUTES + self.BUFFER_MINUTES)
 
+    _ARRANGEMENT_CODE_MAP = {
+        'birthday': 'ARR-BIRTHDAY',
+        'anniversary': 'ARR-ANNIV',
+        'romantic': 'ARR-ROMANTIC',
+        'general': 'ARR-GENERAL',
+    }
+
+    _ARRANGEMENT_NAMES = [
+        'Decoración Cumpleaños',
+        'Decoración Aniversario',
+        'Decoración Cita Romántica',
+        'Decoración Normal',
+    ]
+
     @api.model
-    def _get_arrangement_label(self, arrangement_type):
-        labels = OrderedDict([
-            ('none', 'Ninguno'),
-            ('birthday', 'Decoración Cumpleaños +$10.00'),
-            ('anniversary', 'Decoración Aniversario +$15.00'),
-            ('romantic', 'Cita Romántica +$20.00'),
-            ('general', 'Arreglo Especial +$5.00'),
-        ])
-        return labels.get(arrangement_type or 'none', labels['none'])
+    def _get_arrangement_products(self):
+        """Return the 4 arrangement service products for the website form.
+
+        Searches first by 'Arreglos de Mesa' category; falls back to exact
+        name matching so user-created products without the category still work.
+        """
+        category = self.env['product.category'].sudo().search(
+            [('name', '=', 'Arreglos de Mesa')], limit=1
+        )
+        if category:
+            products = self.env['product.template'].sudo().search([
+                ('categ_id', '=', category.id),
+                ('type', '=', 'service'),
+            ], order='name asc')
+        else:
+            products = self.env['product.template'].sudo().search([
+                ('name', 'in', self._ARRANGEMENT_NAMES),
+                ('type', '=', 'service'),
+            ], order='name asc')
+
+        # Deduplicate by name: keep the highest ID (user-created product wins)
+        seen = {}
+        for p in products:
+            if p.name not in seen or p.id > seen[p.name].id:
+                seen[p.name] = p
+
+        return [
+            {
+                'id': p.id,
+                'name': p.name,
+                'price': p.list_price,
+                'label': f"{p.name} +${p.list_price:.2f}",
+            }
+            for p in seen.values()
+        ]
+
+    @api.model
+    def _get_arrangement_label(self, arrangement_type=None, product=None):
+        if product:
+            return f"{product.name} +${product.list_price:.2f}"
+        if not arrangement_type or arrangement_type == 'none':
+            return 'Ninguno'
+        default_code = self._ARRANGEMENT_CODE_MAP.get(arrangement_type)
+        if default_code:
+            prod = self.env['product.template'].sudo().search(
+                [('default_code', '=', default_code)], limit=1
+            )
+            if prod:
+                return f"{prod.name} +${prod.list_price:.2f}"
+        return arrangement_type
 
     @api.model
     def _get_arrangement_cost_label(self, arrangement_type):
-        cost_labels = {
-            'none': '',
-            'birthday': '+$10.00',
-            'anniversary': '+$15.00',
-            'romantic': '+$20.00',
-            'general': '+$5.00',
-        }
-        return cost_labels.get(arrangement_type or 'none', '')
+        if not arrangement_type or arrangement_type == 'none':
+            return ''
+        default_code = self._ARRANGEMENT_CODE_MAP.get(arrangement_type)
+        if default_code:
+            product = self.env['product.template'].sudo().search(
+                [('default_code', '=', default_code)], limit=1
+            )
+            if product:
+                return f"+${product.list_price:.2f}"
+        return ''
 
     @api.model
     def _validate_requested_start_datetime(self, start_datetime):
@@ -345,7 +413,7 @@ class RestaurantTableReservation(models.Model):
                 continue
             domain = [
                 ("id", "!=", reservation.id),
-                ("table_id", "=", reservation.table_id.id),
+                ("table_id", "=", reservation.table_id.id),  
                 ("state", "not in", ("cancelled", "done")),
                 ("start_datetime", "<", reservation.end_datetime),
                 ("end_datetime", ">", reservation.start_datetime),
@@ -361,8 +429,38 @@ class RestaurantTableReservation(models.Model):
         self.write({"state": "confirmed"})
         self._notify_pos_reservation_change()
 
+    def _create_pos_order_for_reservation(self):
+        """Create an empty draft POS order for the table so it appears occupied in the floor map."""
+        session = self.env['pos.session'].sudo().search(
+            [('state', '=', 'opened')], limit=1
+        )
+        if not session:
+            return
+        for reservation in self:
+            if not reservation.table_id:
+                continue
+            already_open = self.env['pos.order'].sudo().search_count([
+                ('table_id', '=', reservation.table_id.id),
+                ('state', '=', 'draft'),
+                ('session_id', '=', session.id),
+            ])
+            if already_open:
+                continue
+            self.env['pos.order'].sudo().create({
+                'session_id': session.id,
+                'table_id': reservation.table_id.id,
+                'state': 'draft',
+                'partner_id': reservation.partner_id.id if reservation.partner_id else False,
+                'amount_tax': 0.0,
+                'amount_total': 0.0,
+                'amount_paid': 0.0,
+                'amount_return': 0.0,
+                'pos_reference': '',
+            })
+
     def action_seated(self):
         self.write({"state": "seated"})
+        self._create_pos_order_for_reservation()
         self._notify_pos_reservation_change()
 
     def action_done(self):
