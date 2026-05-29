@@ -19,9 +19,9 @@
         "data/delivery_sequence.xml",
         "data/delivery_incident_sequence.xml",
         "data/mail_templates.xml",
-        "data/website_cleanup.xml",
         "security/ir.model.access.csv",
         "security/ir_rule.xml",
+        "security/single_address_storefront.xml",
         "views/res_company_views.xml",
         "views/delivery_order_views.xml",
         "views/delivery_incident_views.xml",
@@ -33,6 +33,7 @@
         "views/portal_delivery_templates.xml",
         "views/menu.xml",
         "data/delivery_schedule_default.xml",
+        "data/website_cleanup.xml",
     ],
     "assets": {
         "web.assets_frontend": [

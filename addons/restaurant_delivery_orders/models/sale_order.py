@@ -254,12 +254,12 @@ class SaleOrder(models.Model):
         }
 
     def _sync_delivery_order_from_sale(self):
-        DeliveryOrder = self.env["restaurant.delivery.order"]
+        DeliveryOrder = self.env["restaurant.delivery.order"].sudo()
         for order in self:
             if not order._is_delivery_sync_candidate():
                 continue
             order._ensure_fixed_delivery_fee_line()
-            delivery_order = order.delivery_order_id or DeliveryOrder.search(
+            delivery_order = order.delivery_order_id.sudo() or DeliveryOrder.search(
                 [("sale_order_id", "=", order.id)], limit=1
             )
             vals = order._prepare_delivery_order_vals(delivery_order)
@@ -306,12 +306,14 @@ class SaleOrder(models.Model):
         self._validate_scheduled_delivery_slot()
         result = super().action_confirm()
         self._ensure_fixed_delivery_fee_line()
-        self._sync_delivery_order_from_sale()
+        if not self.env.context.get("skip_delivery_sync"):
+            self._sync_delivery_order_from_sale()
         return result
 
     def _action_cancel(self):
         result = super()._action_cancel()
-        self._sync_delivery_order_from_sale()
+        if not self.env.context.get("skip_delivery_sync"):
+            self._sync_delivery_order_from_sale()
         return result
 
     def write(self, vals):

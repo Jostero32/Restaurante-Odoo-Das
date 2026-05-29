@@ -15,13 +15,8 @@ class RestaurantDeliveryPortal(CustomerPortal):
             values["delivery_order_count"] = request.env["restaurant.delivery.order"].sudo().search_count(
                 self._get_delivery_orders_domain(partner=partner)
             )
-        if "delivery_invoice_count" in counters or "delivery_invoice_pending_count" in counters:
-            invoices = self._get_delivery_invoice_records(partner=partner)
-            posted_invoices = invoices.filtered(lambda inv: inv.state == "posted")
-            values["delivery_invoice_count"] = len(invoices)
-            values["delivery_invoice_pending_count"] = len(
-                posted_invoices.filtered(lambda inv: inv.payment_state not in {"paid", "reversed"})
-            )
+        if "delivery_invoice_count" in counters:
+            values["delivery_invoice_count"] = len(self._get_delivery_invoice_records(partner=partner))
         return values
 
     def _get_delivery_orders_domain(self, partner=None):

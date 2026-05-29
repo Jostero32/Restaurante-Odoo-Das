@@ -380,6 +380,7 @@ class RestaurantDeliveryOrder(models.Model):
         users = self.env["res.users"]
         for group_xmlid in [
             "restaurant_casa_vieja_base.group_restaurant_cocinero",
+            "restaurant_casa_vieja_base.group_restaurant_mesero",
             "restaurant_casa_vieja_base.group_restaurant_repartidor",
             "restaurant_casa_vieja_base.group_restaurant_administracion",
             "restaurant_casa_vieja_base.group_restaurant_administrador",
@@ -559,6 +560,34 @@ class RestaurantDeliveryOrder(models.Model):
             users_in_both.write({"groups_id": [(3, repartidor_group.id)]})
 
     @api.model
+    def _enforce_single_address_storefront(self):
+        # Storefront de delivery usa una sola direccion. El XML de seguridad
+        # ya quita el grupo 'Delivery Address' de public/portal a futuro,
+        # pero los usuarios existentes lo retienen por el many2many users.
+        # Aqui los limpiamos, preservando internal users (backend).
+        delivery_addr_group = self.env.ref(
+            "account.group_delivery_invoice_address", raise_if_not_found=False
+        )
+        if not delivery_addr_group:
+            return
+        public_group = self.env.ref("base.group_public", raise_if_not_found=False)
+        portal_group = self.env.ref("base.group_portal", raise_if_not_found=False)
+        internal_group = self.env.ref("base.group_user", raise_if_not_found=False)
+        if not internal_group or not (public_group or portal_group):
+            return
+        candidate_users = self.env["res.users"]
+        if public_group:
+            candidate_users |= public_group.sudo().users
+        if portal_group:
+            candidate_users |= portal_group.sudo().users
+        candidate_users -= internal_group.sudo().users
+        users_to_clean = candidate_users & delivery_addr_group.sudo().users
+        if users_to_clean:
+            delivery_addr_group.sudo().write(
+                {"users": [(3, user.id) for user in users_to_clean]}
+            )
+
+    @api.model
     def _update_menu_groups(self, menu_xmlid, add_group_xmlids=None, remove_group_xmlids=None, replace_group_xmlids=None):
         menu = self.env.ref(menu_xmlid, raise_if_not_found=False)
         if not menu:
@@ -680,9 +709,9 @@ class RestaurantDeliveryOrder(models.Model):
         if invalid:
             raise UserError(_("Solo se pueden entregar pedidos en ruta."))
         self.write({"state": "delivered"})
-        sale_orders = self.mapped("sale_order_id").filtered(lambda order: order.state != "cancel")
+        sale_orders = self.sudo().mapped("sale_order_id").filtered(lambda order: order.state != "cancel")
         if sale_orders:
-            sale_orders.sudo().action_finalize_delivery_invoicing()
+            sale_orders.with_context(skip_delivery_sync=True).action_finalize_delivery_invoicing()
 
     def action_cancel(self):
         if self._is_repartidor_only_user():

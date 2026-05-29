@@ -15,6 +15,7 @@
     ],
     "data": [
         "security/ir.model.access.csv",
+        "security/ir_rule.xml",
         "views/restaurant_table_views.xml",
         "views/table_reservation_views.xml",
         "views/reservation_website_templates.xml",
