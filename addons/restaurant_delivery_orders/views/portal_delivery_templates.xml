@@ -3,6 +3,9 @@
     <record id="sale.portal_my_home_sale" model="ir.ui.view">
         <field name="active" eval="False"/>
     </record>
+    <record id="account.portal_my_home_invoice" model="ir.ui.view">
+        <field name="active" eval="False"/>
+    </record>
 
     <template id="portal_my_home_menu_delivery" name="Portal breadcrumbs delivery" inherit_id="portal.portal_breadcrumbs" priority="35">
         <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
@@ -12,6 +15,14 @@
             </li>
             <li t-if="delivery_order" class="breadcrumb-item active">
                 <t t-out="delivery_order.name"/>
+            </li>
+
+            <li t-if="page_name == 'delivery_invoice'" t-attf-class="breadcrumb-item #{'active ' if not delivery_invoice else ''}">
+                <a t-if="delivery_invoice" t-attf-href="/my/delivery/invoices?{{ keep_query() }}">Mis facturas delivery</a>
+                <t t-else="">Mis facturas delivery</t>
+            </li>
+            <li t-if="delivery_invoice" class="breadcrumb-item active">
+                <t t-out="delivery_invoice.name"/>
             </li>
         </xpath>
     </template>
@@ -28,7 +39,48 @@
                 <t t-set="text">Sigue tu pedido, facturas y soporte en un solo flujo</t>
                 <t t-set="placeholder_count" t-value="'delivery_order_count'"/>
             </t>
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="icon" t-value="'/account/static/description/icon.png'"/>
+                <t t-set="title">Mis facturas delivery</t>
+                <t t-set="url" t-value="'/my/delivery/invoices'"/>
+                <t t-set="text">Consulta estado de pago, saldo y detalle de envio</t>
+                <t t-set="placeholder_count" t-value="'delivery_invoice_count'"/>
+            </t>
         </div>
+    </template>
+
+    <template id="portal_delivery_metrics_block" name="Portal Delivery Metrics">
+        <t t-set="metrics" t-value="delivery_portal_metrics or {}"/>
+        <section class="row g-2 rcv-portal-metrics mb-3">
+            <div class="col-6 col-lg-3">
+                <article class="rcv-metric-card">
+                    <span class="rcv-metric-label">Pedidos activos</span>
+                    <strong class="rcv-metric-value" t-out="metrics.get('orders_active') or 0"/>
+                    <small class="rcv-metric-help">de <t t-out="metrics.get('orders_total') or 0"/> pedidos</small>
+                </article>
+            </div>
+            <div class="col-6 col-lg-3">
+                <article class="rcv-metric-card">
+                    <span class="rcv-metric-label">Pedidos entregados</span>
+                    <strong class="rcv-metric-value" t-out="metrics.get('orders_delivered') or 0"/>
+                    <small class="rcv-metric-help">historial completado</small>
+                </article>
+            </div>
+            <div class="col-6 col-lg-3">
+                <article class="rcv-metric-card">
+                    <span class="rcv-metric-label">Facturas pendientes</span>
+                    <strong class="rcv-metric-value" t-out="metrics.get('invoice_pending') or 0"/>
+                    <small class="rcv-metric-help" t-out="metrics.get('invoice_pending_amount_display')"/>
+                </article>
+            </div>
+            <div class="col-6 col-lg-3">
+                <article class="rcv-metric-card">
+                    <span class="rcv-metric-label">Total facturado</span>
+                    <strong class="rcv-metric-value" t-out="metrics.get('invoice_posted') or 0"/>
+                    <small class="rcv-metric-help" t-out="metrics.get('invoice_total_amount_display')"/>
+                </article>
+            </div>
+        </section>
     </template>
 
     <template id="portal_my_delivery_orders" name="Portal - Mis pedidos delivery">
@@ -38,6 +90,8 @@
             <t t-call="portal.portal_searchbar">
                 <t t-set="title">Mis pedidos delivery</t>
             </t>
+
+            <t t-call="restaurant_delivery_orders.portal_delivery_metrics_block"/>
 
             <div t-if="not delivery_orders" class="alert alert-warning" role="alert">
                 Aun no tienes pedidos delivery registrados.
@@ -60,6 +114,11 @@
                                         <span t-attf-class="badge rounded-pill text-bg-#{order_data.get('state_class')}">
                                             <t t-out="order_data.get('state_label')"/>
                                         </span>
+                                    </div>
+
+                                    <div t-if="order_data.get('is_scheduled')" class="alert alert-primary py-2 px-3 mt-2 mb-0 small d-flex align-items-center gap-2">
+                                        <i class="fa fa-calendar-check-o"/>
+                                        <span>Entrega programada para <strong t-out="order_data.get('scheduled_for_display')"/>.</span>
                                     </div>
 
                                     <div class="row g-2 mt-2">
@@ -102,6 +161,269 @@
         </t>
     </template>
 
+    <template id="portal_my_delivery_invoices" name="Portal - Mis facturas delivery">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Mis facturas delivery</t>
+            </t>
+
+            <t t-call="restaurant_delivery_orders.portal_delivery_metrics_block"/>
+
+            <div t-if="not delivery_invoice_rows" class="alert alert-warning" role="alert">
+                Aun no tienes facturas delivery registradas.
+            </div>
+
+            <div t-if="delivery_invoice_rows" class="row g-3">
+                <t t-foreach="delivery_invoice_rows" t-as="row">
+                    <t t-set="invoice" t-value="row.get('record')"/>
+                    <div class="col-12">
+                        <article class="rcv-invoice-card card border-0 shadow-sm">
+                            <div class="card-body">
+                                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                                    <div>
+                                        <h5 class="mb-1 text-dark">
+                                            <a t-att-href="row.get('detail_url')" class="text-decoration-none text-dark">
+                                                <t t-out="invoice.name"/>
+                                            </a>
+                                        </h5>
+                                        <p class="mb-0 text-muted small">
+                                            <i class="fa fa-calendar me-1" title="Fecha"/> <span t-field="invoice.invoice_date"/>
+                                            <t t-if="invoice.invoice_date_due">
+                                                <span class="mx-1">|</span>
+                                                Vence: <span t-field="invoice.invoice_date_due"/>
+                                            </t>
+                                        </p>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span t-attf-class="badge rounded-pill text-bg-#{row.get('state_class')}">
+                                            <t t-out="row.get('state_label')"/>
+                                        </span>
+                                        <span t-if="row.get('is_overdue')" class="badge rounded-pill text-bg-danger">
+                                            Vencida
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="row g-2 mt-2">
+                                    <div class="col-12 col-md-3">
+                                        <div class="rcv-info-block">
+                                            <small>Subtotal comida</small>
+                                            <p class="mb-0">
+                                                <span t-out="row.get('food_subtotal')" t-options="{'widget': 'monetary', 'display_currency': invoice.currency_id}"/>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <div class="rcv-info-block">
+                                            <small>Envio</small>
+                                            <p class="mb-0">
+                                                <span t-out="row.get('delivery_fee')" t-options="{'widget': 'monetary', 'display_currency': invoice.currency_id}"/>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <div class="rcv-info-block">
+                                            <small>Total factura</small>
+                                            <p class="mb-0"><span t-field="invoice.amount_total"/></p>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-3">
+                                        <div class="rcv-info-block">
+                                            <small>Saldo pendiente</small>
+                                            <p class="mb-0"><span t-field="invoice.amount_residual"/></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <span class="badge text-bg-light border" t-if="row.get('related_delivery_orders')">
+                                            Pedidos vinculados: <t t-out="len(row.get('related_delivery_orders'))"/>
+                                        </span>
+                                        <t t-foreach="row.get('related_delivery_orders')" t-as="order">
+                                            <a t-att-href="order.get_portal_url()" class="badge text-bg-light border text-decoration-none">
+                                                <t t-out="order.name"/>
+                                            </a>
+                                        </t>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <a t-att-href="row.get('detail_url')" class="btn btn-sm btn-outline-dark">
+                                            <i class="fa fa-eye me-1"/>Ver detalle
+                                        </a>
+                                        <a t-att-href="row.get('pdf_url')" class="btn btn-sm btn-dark">
+                                            <i class="fa fa-download me-1"/>PDF
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_delivery_invoice_page" name="Portal - Detalle factura delivery">
+        <t t-call="portal.portal_layout">
+            <t t-set="invoice_data" t-value="delivery_invoice_data or {}"/>
+            <t t-set="invoice" t-value="invoice_data.get('record')"/>
+
+            <t t-call="restaurant_delivery_orders.portal_delivery_metrics_block"/>
+
+            <section class="rcv-delivery-detail" t-if="invoice">
+                <header class="card border-0 shadow-sm rcv-detail-hero">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                            <div>
+                                <h3 class="mb-1 text-dark">
+                                    Factura <span t-out="invoice.name"/>
+                                </h3>
+                                <p class="mb-0 text-muted">
+                                    <i class="fa fa-calendar me-1" title="Fecha"/> <span t-field="invoice.invoice_date"/>
+                                    <t t-if="invoice.invoice_date_due">
+                                        <span class="mx-1">|</span>
+                                        Vence: <span t-field="invoice.invoice_date_due"/>
+                                    </t>
+                                </p>
+                            </div>
+                            <span t-attf-class="badge rounded-pill text-bg-#{invoice_data.get('state_class')} fs-6 px-3 py-2">
+                                <t t-out="invoice_data.get('state_label')"/>
+                            </span>
+                        </div>
+                        <div class="row g-2 mt-2">
+                            <div class="col-12 col-md-4">
+                                <div class="rcv-kpi">
+                                    <small>Total factura</small>
+                                    <strong><span t-field="invoice.amount_total"/></strong>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <div class="rcv-kpi">
+                                    <small>Saldo pendiente</small>
+                                    <strong><span t-field="invoice.amount_residual"/></strong>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <div class="rcv-kpi">
+                                    <small>Estado de pago</small>
+                                    <strong><t t-out="invoice_data.get('state_label')"/></strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-12 col-lg-8">
+                        <article class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h5 class="mb-3">Resumen de cobro</h5>
+                                <div class="rcv-invoice-breakdown">
+                                    <div class="rcv-breakdown-row">
+                                        <span>Subtotal comida</span>
+                                        <strong>
+                                            <span t-out="invoice_data.get('food_subtotal')" t-options="{'widget': 'monetary', 'display_currency': invoice.currency_id}"/>
+                                        </strong>
+                                    </div>
+                                    <div class="rcv-breakdown-row">
+                                        <span>Costo de envio</span>
+                                        <strong>
+                                            <span t-out="invoice_data.get('delivery_fee')" t-options="{'widget': 'monetary', 'display_currency': invoice.currency_id}"/>
+                                        </strong>
+                                    </div>
+                                    <div class="rcv-breakdown-row rcv-breakdown-total">
+                                        <span>Total factura</span>
+                                        <strong><span t-field="invoice.amount_total"/></strong>
+                                    </div>
+                                    <div class="rcv-breakdown-row">
+                                        <span>Pagado</span>
+                                        <strong>
+                                            <span t-out="invoice.amount_total - invoice.amount_residual" t-options="{'widget': 'monetary', 'display_currency': invoice.currency_id}"/>
+                                        </strong>
+                                    </div>
+                                    <div class="rcv-breakdown-row">
+                                        <span>Saldo pendiente</span>
+                                        <strong><span t-field="invoice.amount_residual"/></strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="card border-0 shadow-sm mt-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Pedidos delivery vinculados</h5>
+                                    <span class="badge text-bg-light border">
+                                        Total: <t t-out="len(delivery_invoice_orders or [])"/>
+                                    </span>
+                                </div>
+                                <div t-if="not delivery_invoice_orders" class="alert alert-light border mb-0">
+                                    Esta factura no tiene pedidos delivery vinculados.
+                                </div>
+                                <div t-if="delivery_invoice_orders" class="d-flex flex-column gap-2">
+                                    <t t-foreach="delivery_invoice_orders" t-as="order">
+                                        <a t-att-href="order.get_portal_url()" class="rcv-related-order d-flex justify-content-between align-items-center text-decoration-none">
+                                            <span>
+                                                <strong class="text-dark" t-out="order.name"/>
+                                                <span class="text-muted ms-2" t-out="order.customer_status_label"/>
+                                            </span>
+                                            <span class="text-muted"><span t-field="order.amount_total"/></span>
+                                        </a>
+                                    </t>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="col-12 col-lg-4">
+                        <article class="card border-0 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="mb-3">Acciones de factura</h6>
+                                <div class="d-grid gap-2">
+                                    <a t-att-href="invoice_data.get('pdf_url')" class="btn btn-dark">
+                                        Descargar PDF
+                                    </a>
+                                    <a t-att-href="invoice.get_portal_url()" class="btn btn-outline-dark">
+                                        Abrir factura Odoo
+                                    </a>
+                                    <a href="/my/delivery/invoices" class="btn btn-outline-secondary">
+                                        Volver a mis facturas
+                                    </a>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="card border-0 shadow-sm mt-3">
+                            <div class="card-body">
+                                <h6 class="mb-3">Estado contable</h6>
+                                <ul class="list-unstyled mb-0 d-flex flex-column gap-2 small">
+                                    <li class="d-flex justify-content-between">
+                                        <span class="text-muted">Documento</span>
+                                        <strong t-out="invoice.name"/>
+                                    </li>
+                                    <li class="d-flex justify-content-between">
+                                        <span class="text-muted">Estado asiento</span>
+                                        <strong t-out="invoice.state"/>
+                                    </li>
+                                    <li class="d-flex justify-content-between">
+                                        <span class="text-muted">Estado pago tecnico</span>
+                                        <strong t-out="invoice.payment_state"/>
+                                    </li>
+                                    <li class="d-flex justify-content-between">
+                                        <span class="text-muted">Referencia</span>
+                                        <strong t-out="invoice.ref or '-'"/>
+                                    </li>
+                                </ul>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </section>
+        </t>
+    </template>
+
     <template id="portal_delivery_order_page" name="Portal - Detalle pedido delivery">
         <t t-call="portal.portal_layout">
             <t t-set="order" t-value="delivery_order_data.get('record')"/>
@@ -117,9 +439,19 @@
                                     <i class="fa fa-calendar me-1" title="Fecha"/> <span t-field="order.order_datetime" t-options="{'widget': 'datetime'}"/>
                                 </p>
                             </div>
-                            <span t-attf-class="badge rounded-pill text-bg-#{delivery_order_data.get('state_class')} fs-6 px-3 py-2">
+                            <span t-attf-class="badge rounded-pill text-bg-#{delivery_order_data.get('state_class')} fs-6 px-3 py-2 align-self-start">
                                 <t t-out="delivery_order_data.get('state_label')"/>
                             </span>
+                        </div>
+                        <div t-if="reorder_empty" class="alert alert-warning py-2 px-3 mt-3 mb-0 small">
+                            Ningun producto de este pedido sigue disponible en el menu.
+                        </div>
+                        <div t-if="delivery_order_data.get('is_scheduled')" class="alert alert-primary py-2 px-3 mt-3 mb-0 d-flex align-items-center gap-2">
+                            <i class="fa fa-calendar-check-o fa-lg"/>
+                            <div>
+                                <div class="fw-semibold">Entrega programada</div>
+                                <div class="small">Te lo entregamos <strong t-out="delivery_order_data.get('scheduled_for_display')"/>.</div>
+                            </div>
                         </div>
                         <div class="row g-2 mt-2">
                             <div class="col-12 col-md-4">
@@ -140,6 +472,30 @@
                                     <strong><span t-field="order.invoice_residual_amount"/></strong>
                                 </div>
                             </div>
+                        </div>
+                        <t t-set="primary_invoice" t-value="invoice_rows[0].get('record') if invoice_rows else None"/>
+                        <div class="d-flex flex-wrap gap-2 mt-3"
+                             t-if="delivery_order.state in ('delivered', 'cancelled') or primary_invoice">
+                            <form t-if="delivery_order.state in ('delivered', 'cancelled')"
+                                  t-attf-action="/my/delivery/#{delivery_order.id}/reorder"
+                                  method="post" class="m-0">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-dark">
+                                    <i class="fa fa-refresh me-2"/>Volver a pedir lo mismo
+                                </button>
+                            </form>
+                            <a t-if="primary_invoice"
+                               t-att-href="invoice_rows[0].get('pdf_url')"
+                               class="btn btn-outline-dark">
+                                <i class="fa fa-download me-2"/>Descargar factura
+                            </a>
+                            <a href="#delivery-chat" class="btn btn-outline-secondary">
+                                <i class="fa fa-comments me-2"/>Chat con el equipo
+                            </a>
+                            <a t-if="delivery_order.state == 'delivered' and not delivery_order.has_rating"
+                               href="#delivery-rating" class="btn btn-outline-warning">
+                                <i class="fa fa-star me-2"/>Califica tu pedido
+                            </a>
                         </div>
                     </div>
                 </header>
@@ -202,25 +558,41 @@
                                                 <th>Factura</th>
                                                 <th>Fecha</th>
                                                 <th>Estado</th>
+                                                <th class="text-end">Comida</th>
+                                                <th class="text-end">Envio</th>
                                                 <th class="text-end">Total</th>
                                                 <th class="text-end">Saldo</th>
                                                 <th class="text-end">Accion</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            <t t-foreach="invoice_rows" t-as="inv">
+                                            <t t-foreach="invoice_rows" t-as="row">
+                                                <t t-set="inv" t-value="row.get('record')"/>
                                                 <tr>
                                                     <td><span t-out="inv.name"/></td>
                                                     <td><span t-field="inv.invoice_date"/></td>
                                                     <td>
-                                                        <span t-attf-class="badge rounded-pill text-bg-#{'success' if inv.payment_state in ['paid', 'reversed'] else 'warning'}">
-                                                            <t t-out="inv.payment_state"/>
+                                                        <span t-attf-class="badge rounded-pill text-bg-#{row.get('state_class')}">
+                                                            <t t-out="row.get('state_label')"/>
                                                         </span>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <span t-out="row.get('food_subtotal')" t-options="{'widget': 'monetary', 'display_currency': inv.currency_id}"/>
+                                                    </td>
+                                                    <td class="text-end">
+                                                        <span t-out="row.get('delivery_fee')" t-options="{'widget': 'monetary', 'display_currency': inv.currency_id}"/>
                                                     </td>
                                                     <td class="text-end"><span t-field="inv.amount_total"/></td>
                                                     <td class="text-end"><span t-field="inv.amount_residual"/></td>
                                                     <td class="text-end">
-                                                        <a t-att-href="inv.get_portal_url()" class="btn btn-outline-dark btn-sm">Ver</a>
+                                                        <div class="btn-group btn-group-sm" role="group">
+                                                            <a t-att-href="row.get('detail_url')" class="btn btn-outline-dark" title="Ver detalle de la factura">
+                                                                <i class="fa fa-eye"/>
+                                                            </a>
+                                                            <a t-att-href="row.get('pdf_url')" class="btn btn-dark" title="Descargar PDF">
+                                                                <i class="fa fa-download"/>
+                                                            </a>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             </t>
@@ -282,8 +654,62 @@
                         </article>
                     </div>
                 </div>
+
+                <article t-if="delivery_order.state == 'delivered'" class="card border-0 shadow-sm mt-3" id="delivery-rating">
+                    <div class="card-body">
+                        <h5 class="mb-2">Como estuvo tu pedido?</h5>
+                        <div t-if="rating_submitted" class="alert alert-success py-2 px-3 small">
+                            Gracias por calificar! Recibimos tu opinion.
+                        </div>
+                        <div t-if="rating_error == 'duplicate'" class="alert alert-info py-2 px-3 small">
+                            Ya habias calificado este pedido.
+                        </div>
+                        <div t-if="rating_error == 'invalid'" class="alert alert-danger py-2 px-3 small">
+                            Selecciona entre 1 y 5 estrellas.
+                        </div>
+                        <div t-if="delivery_order.has_rating" class="d-flex flex-column gap-1">
+                            <div class="fs-3">
+                                <t t-foreach="range(1, 6)" t-as="i">
+                                    <i t-attf-class="fa #{'fa-star text-warning' if i &lt;= delivery_order.rating_score else 'fa-star-o text-muted'}"/>
+                                </t>
+                            </div>
+                            <div t-if="delivery_order.rating_comment" class="text-muted small fst-italic">
+                                "<t t-out="delivery_order.rating_comment"/>"
+                            </div>
+                        </div>
+                        <form t-if="not delivery_order.has_rating"
+                              t-attf-action="/my/delivery/#{delivery_order.id}/rate"
+                              method="post" class="d-flex flex-column gap-2">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <div class="rcv-stars d-flex flex-row-reverse justify-content-end gap-1 fs-3">
+                                <t t-foreach="[5, 4, 3, 2, 1]" t-as="s">
+                                    <input type="radio" t-attf-id="rate_#{s}" name="score" t-att-value="s" class="rcv-star-input visually-hidden" required="required"/>
+                                    <label t-attf-for="rate_#{s}" t-attf-title="#{s} estrella(s)" class="rcv-star-label">
+                                        <i class="fa fa-star"/>
+                                    </label>
+                                </t>
+                            </div>
+                            <textarea name="comment" rows="3" class="form-control" maxlength="500" placeholder="Cuentanos brevemente (opcional)"/>
+                            <button type="submit" class="btn btn-dark btn-sm align-self-start">Enviar calificacion</button>
+                        </form>
+                    </div>
+                </article>
+
+                <article class="card border-0 shadow-sm mt-3" id="delivery-chat">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <h5 class="mb-0">Chat con el equipo</h5>
+                            <span t-if="delivery_order.driver_id" class="badge text-bg-light border small">
+                                <i class="fa fa-motorcycle me-1"/>Repartidor: <t t-out="delivery_order.driver_id.name"/>
+                            </span>
+                        </div>
+                        <p class="text-muted small mb-3">
+                            Escribe aqui para coordinar la entrega con el restaurante o el repartidor. Los mensajes quedan registrados en el pedido.
+                        </p>
+                        <t t-call="portal.message_thread"/>
+                    </div>
+                </article>
             </section>
         </t>
     </template>
 </odoo>
-

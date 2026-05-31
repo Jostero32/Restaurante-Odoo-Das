@@ -1,5 +1,50 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <template id="checkout_delivery_schedule"
+              inherit_id="website_sale.checkout"
+              name="Checkout - Programar entrega">
+        <xpath expr="//div[@id='shop_checkout']" position="inside">
+            <div id="o_delivery_schedule_block" class="mb-4">
+                <h4 class="text-uppercase small fs-6 fw-bold">Cuando lo quieres recibir?</h4>
+                <div class="rounded-3 border p-3 bg-white">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio"
+                               name="o_delivery_schedule_mode"
+                               id="o_delivery_schedule_now"
+                               value="now"
+                               checked="checked"/>
+                        <label class="form-check-label" for="o_delivery_schedule_now">
+                            <span class="fw-semibold">Lo antes posible</span>
+                            <span class="text-muted small ms-1" id="o_delivery_schedule_now_hint">Coordinamos la salida en el menor tiempo posible.</span>
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio"
+                               name="o_delivery_schedule_mode"
+                               id="o_delivery_schedule_later"
+                               value="later"/>
+                        <label class="form-check-label" for="o_delivery_schedule_later">
+                            <span class="fw-semibold">Programar para un horario</span>
+                        </label>
+                    </div>
+                    <div id="o_delivery_schedule_picker" class="row g-2 mt-2 d-none">
+                        <div class="col-12 col-md-6">
+                            <label for="o_delivery_schedule_day" class="form-label small text-muted mb-1">Dia</label>
+                            <select id="o_delivery_schedule_day" class="form-select"/>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label for="o_delivery_schedule_slot" class="form-label small text-muted mb-1">Hora</label>
+                            <select id="o_delivery_schedule_slot" class="form-select"/>
+                        </div>
+                        <div class="col-12">
+                            <div id="o_delivery_schedule_feedback" class="small text-muted mt-1"/>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </xpath>
+    </template>
+
     <template id="website_sale_product_delivery_ux" inherit_id="website_sale.product" name="Producto - UX Delivery Restaurante">
         <xpath expr="//div[@t-field='product.description_ecommerce']" position="after">
             <t t-if="product.website_description and not product.description_ecommerce">

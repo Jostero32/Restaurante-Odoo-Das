@@ -13,6 +13,7 @@
         "account",
         "restaurant_casa_vieja_base",
         "website_sale",
+        "l10n_ec_website_sale",
     ],
     "data": [
         "data/delivery_sequence.xml",
@@ -24,15 +25,20 @@
         "views/res_company_views.xml",
         "views/delivery_order_views.xml",
         "views/delivery_incident_views.xml",
+        "views/delivery_rating_views.xml",
+        "views/delivery_schedule_views.xml",
         "views/sale_order_views.xml",
         "views/product_template_views.xml",
         "views/website_sale_templates.xml",
         "views/portal_delivery_templates.xml",
         "views/menu.xml",
+        "data/delivery_schedule_default.xml",
     ],
     "assets": {
         "web.assets_frontend": [
             "restaurant_delivery_orders/static/src/scss/portal_delivery.scss",
+            "restaurant_delivery_orders/static/src/js/checkout_delivery_schedule.js",
+            "restaurant_delivery_orders/static/src/js/portal_chat_refresh.js",
         ],
     },
     "installable": True,

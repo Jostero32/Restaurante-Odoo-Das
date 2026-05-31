@@ -4,13 +4,21 @@
         <field name="name">restaurant.delivery.order.list</field>
         <field name="model">restaurant.delivery.order</field>
         <field name="arch" type="xml">
-            <list string="Pedidos Delivery">
+            <list string="Pedidos Delivery"
+                  decoration-primary="display_state_key == 'scheduled_received'"
+                  decoration-warning="display_state_key == 'on_route'"
+                  decoration-success="display_state_key == 'delivered'"
+                  decoration-muted="display_state_key == 'cancelled'">
                 <field name="name"/>
                 <field name="sale_order_id"/>
                 <field name="customer_name"/>
                 <field name="customer_phone"/>
                 <field name="driver_id"/>
                 <field name="eta_minutes"/>
+                <field name="is_scheduled" optional="hide"/>
+                <field name="scheduled_for" optional="show"/>
+                <field name="scheduled_for_display" string="Programado" optional="show"/>
+                <field name="display_state_key" column_invisible="True"/>
                 <field name="amount_total"/>
                 <field name="invoice_pending_count" string="Facturas pendientes"/>
                 <field name="incident_count" string="Incidencias"/>
@@ -33,6 +41,19 @@
                     <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,assigned,on_route,delivered"/>
                 </header>
                 <sheet>
+                    <field name="display_state_key" invisible="1"/>
+                    <field name="scheduled_for_display" invisible="1"/>
+                    <div class="alert alert-primary d-flex gap-2 align-items-center mb-3"
+                         invisible="display_state_key != 'scheduled_received'">
+                        <i class="fa fa-calendar-check-o fa-lg"/>
+                        <div>
+                            <div class="fw-semibold">Pedido programado</div>
+                            <div class="small">
+                                Entrega para <strong><field name="scheduled_for_display" readonly="1" nolabel="1"/></strong>.
+                                Aun no inicia preparacion.
+                            </div>
+                        </div>
+                    </div>
                     <group>
                         <group>
                             <field name="name" readonly="1"/>
@@ -46,6 +67,8 @@
                             <field name="order_datetime"/>
                             <field name="driver_id"/>
                             <field name="eta_minutes"/>
+                            <field name="is_scheduled"/>
+                            <field name="scheduled_for" invisible="not is_scheduled" required="is_scheduled"/>
                             <field name="amount_total"/>
                             <field name="currency_id" invisible="1"/>
                         </group>
@@ -92,6 +115,21 @@
                                 </list>
                             </field>
                         </page>
+                        <page string="Calificacion" invisible="not has_rating">
+                            <field name="has_rating" invisible="1"/>
+                            <group>
+                                <field name="rating_score" readonly="1"/>
+                                <field name="rating_comment" readonly="1"/>
+                            </group>
+                            <field name="customer_rating_ids" readonly="1" nolabel="1">
+                                <list create="false" delete="false">
+                                    <field name="rated_at"/>
+                                    <field name="partner_id"/>
+                                    <field name="score" widget="priority"/>
+                                    <field name="comment"/>
+                                </list>
+                            </field>
+                        </page>
                     </notebook>
                 </sheet>
                 <chatter/>
@@ -99,10 +137,22 @@
         </field>
     </record>
 
+    <record id="view_restaurant_delivery_order_calendar" model="ir.ui.view">
+        <field name="name">restaurant.delivery.order.calendar</field>
+        <field name="model">restaurant.delivery.order</field>
+        <field name="arch" type="xml">
+            <calendar string="Calendario delivery" date_start="scheduled_for" mode="week" color="state" quick_create="0">
+                <field name="customer_name"/>
+                <field name="state"/>
+                <field name="driver_id"/>
+            </calendar>
+        </field>
+    </record>
+
     <record id="action_restaurant_delivery_orders" model="ir.actions.act_window">
         <field name="name">Pedidos Delivery</field>
         <field name="res_model">restaurant.delivery.order</field>
-        <field name="view_mode">list,form</field>
+        <field name="view_mode">list,form,calendar</field>
         <field name="context">{'default_state': 'draft'}</field>
         <field name="groups_id" eval="[(6, 0, [ref('restaurant_casa_vieja_base.group_restaurant_cocinero'), ref('restaurant_casa_vieja_base.group_restaurant_mesero'), ref('restaurant_casa_vieja_base.group_restaurant_administracion'), ref('restaurant_casa_vieja_base.group_restaurant_administrador')])]"/>
     </record>
@@ -141,25 +191,38 @@
                 <field name="amount_total"/>
                 <field name="currency_id"/>
                 <field name="state"/>
+                <field name="display_state_key"/>
+                <field name="is_scheduled"/>
+                <field name="scheduled_for_display"/>
+                <field name="message_needaction_counter"/>
                 <templates>
                     <t t-name="card">
                         <main class="d-flex flex-column gap-2">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
-                                    <div class="fw-bold fs-5">
+                                    <div class="fw-bold fs-5 d-flex align-items-center gap-2">
                                         <field name="name"/>
+                                        <span t-if="record.message_needaction_counter.raw_value > 0"
+                                              class="badge text-bg-danger rounded-pill"
+                                              t-att-title="'Mensajes nuevos: ' + String(record.message_needaction_counter.raw_value)">
+                                            <i class="fa fa-comment me-1"/><t t-out="record.message_needaction_counter.raw_value"/>
+                                        </span>
                                     </div>
                                     <div class="text-muted small">
                                         <i class="fa fa-user me-1" title="Cliente"/> <field name="customer_name"/>
                                     </div>
                                 </div>
                                 <div>
-                                    <span t-if="record.state.raw_value == 'assigned'" class="badge text-bg-info">En preparacion</span>
-                                    <span t-if="record.state.raw_value == 'on_route'" class="badge text-bg-warning">En camino</span>
-                                    <span t-if="record.state.raw_value == 'delivered'" class="badge text-bg-success">Entregado</span>
-                                    <span t-if="record.state.raw_value == 'cancelled'" class="badge text-bg-secondary">Cancelado</span>
-                                    <span t-if="record.state.raw_value != 'assigned' and record.state.raw_value != 'on_route' and record.state.raw_value != 'delivered' and record.state.raw_value != 'cancelled'" class="badge text-bg-light">En preparacion</span>
+                                    <span t-if="record.display_state_key.raw_value == 'scheduled_received'" class="badge text-bg-primary">Programado</span>
+                                    <span t-elif="record.state.raw_value == 'assigned'" class="badge text-bg-info">En preparacion</span>
+                                    <span t-elif="record.state.raw_value == 'on_route'" class="badge text-bg-warning">En camino</span>
+                                    <span t-elif="record.state.raw_value == 'delivered'" class="badge text-bg-success">Entregado</span>
+                                    <span t-elif="record.state.raw_value == 'cancelled'" class="badge text-bg-secondary">Cancelado</span>
+                                    <span t-else="" class="badge text-bg-light">En preparacion</span>
                                 </div>
+                            </div>
+                            <div t-if="record.is_scheduled.raw_value" class="rounded-3 px-2 py-1 bg-primary-subtle text-primary-emphasis small">
+                                <i class="fa fa-calendar-check-o me-1" title="Programado"/> <field name="scheduled_for_display"/>
                             </div>
                             <div class="rounded-3 border p-2 bg-light-subtle">
                                 <div class="small text-muted mb-1"><i class="fa fa-map-marker me-1" title="Direccion"/>Direccion</div>
@@ -283,6 +346,7 @@
                         </page>
                     </notebook>
                 </sheet>
+                <chatter/>
             </form>
         </field>
     </record>

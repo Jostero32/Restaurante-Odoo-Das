@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="reservation_page" name="Reservar mesa">
+        <t t-call="website.layout">
+            <t t-set="title">Reservar mesa</t>
+            <div id="wrap" class="o_reservation_page">
+                <section class="o_reservation_hero">
+                    <div class="container">
+                        <p class="o_reservation_kicker">Restaurante Casa Vieja</p>
+                        <h1>Reserva tu mesa en tiempo real</h1>
+                        <p>
+                            Elige si prefieres el salón interior o el patio. La reserva
+                            bloquea la mesa por 1 hora y 15 minutos, incluyendo margen de salida.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="container o_reservation_content">
+                    <t t-if="success_message">
+                        <div class="alert alert-success" role="alert"><t t-esc="success_message"/></div>
+                    </t>
+                    <t t-if="error_message">
+                        <div class="alert alert-danger" role="alert"><t t-esc="error_message"/></div>
+                    </t>
+
+                    <div class="row g-4">
+                        <div class="col-lg-7">
+                            <form action="/reservas/create" method="post" class="o_reservation_form" id="reservation_form">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <input type="hidden" name="table_id" id="table_id" t-att-value="selected_table_id or ''"/>
+                                <input t-if="reschedule_from" type="hidden" name="reschedule_from" t-att-value="reschedule_from"/>
+
+                                <div t-if="reschedule_from" class="alert alert-warning d-flex justify-content-between align-items-center gap-2 mb-3">
+                                    <div>
+                                        <strong>Estas reprogramando la reserva <t t-out="reschedule_source_name"/>.</strong>
+                                        Al guardar, la reserva anterior se cancela y se crea una nueva con los datos elegidos.
+                                    </div>
+                                    <a href="/my/reservations" class="btn btn-sm btn-outline-secondary">Cancelar cambio</a>
+                                </div>
+
+                                <t t-set="logged_partner" t-value="user_id.partner_id.commercial_partner_id"/>
+                                <t t-set="partner_phone" t-value="logged_partner.phone or logged_partner.mobile or ''"/>
+                                <div class="alert alert-light border rounded-3 d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                    <div>
+                                        <div class="text-muted small">Reservando como</div>
+                                        <div class="fw-semibold" t-out="logged_partner.name"/>
+                                        <div class="small text-muted">
+                                            <t t-if="partner_phone">
+                                                <i class="fa fa-phone me-1"/><t t-out="partner_phone"/>
+                                            </t>
+                                            <t t-else="">
+                                                <span class="text-warning"><i class="fa fa-exclamation-triangle me-1"/>Sin telefono en tu perfil. Agregalo desde
+                                                    <a href="/my/account">Mi cuenta</a> para que el restaurante pueda contactarte.</span>
+                                            </t>
+                                        </div>
+                                    </div>
+                                    <a href="/my/account" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fa fa-pencil me-1"/>Cambiar mis datos
+                                    </a>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="party_size">Personas *</label>
+                                        <input id="party_size" name="party_size" type="number" min="1" max="20" step="1" class="form-control" required="required" t-att-value="selected_party_size" oninput="this.value = this.value.replace(/[^0-9]/g, '');"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="date">Fecha *</label>
+                                        <input id="date" name="date" type="date" class="form-control" required="required" t-att-value="selected_date"/>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="time">Hora *</label>
+                                        <select id="time" name="time" class="form-select" required="required" t-att-data-selected="selected_time">
+                                            <option value="">Selecciona...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="zone">Zona preferida *</label>
+                                        <select id="zone" name="zone" class="form-select" required="required">
+                                            <option value="main" t-att-selected="selected_zone == 'main' and 'selected' or None">Interior</option>
+                                            <option value="patio" t-att-selected="selected_zone == 'patio' and 'selected' or None">Patio</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="arrangement_type">Arreglo Especial para la mesa</label>
+                                        <select id="arrangement_product_id" name="arrangement_product_id" class="form-select">
+                                            <option value="0" t-att-selected="not selected_arrangement_product_id and 'selected' or None">Ninguno</option>
+                                            <t t-foreach="arrangement_options" t-as="opt">
+                                                <option t-att-value="opt['id']" t-att-selected="selected_arrangement_product_id == opt['id'] and 'selected' or None">
+                                                    <t t-esc="opt['label']"/>
+                                                </option>
+                                            </t>
+                                        </select>
+                                        <small class="text-primary mt-1 d-block">El costo del arreglo se añadirá a su cuenta final en el restaurante.</small>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Mesa disponible *</label>
+                                        <div id="table_results" class="o_table_results"></div>
+                                        <small class="text-muted d-block mt-2">
+                                            Cuando cambies fecha, hora, personas o zona, las mesas se actualizan automáticamente.
+                                        </small>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label" for="notes">Notas</label>
+                                        <textarea id="notes" name="notes" class="form-control" rows="4" maxlength="500"><t t-esc="notes"/></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 d-flex flex-wrap gap-3 align-items-center">
+                                    <button type="submit" id="btn_submit_reservation" class="btn btn-primary btn-lg">Reservar ahora</button>
+                                    <div class="o_reservation_summary" id="reservation_summary">
+                                        <span>Duración de mesa: 1 hora + 15 minutos de margen.</span>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="col-lg-5">
+                            <aside class="o_reservation_sidebar">
+                                <h2>Mesas y zonas</h2>
+                                <p>Interior y patio se muestran por separado para que elijas la experiencia que buscas.</p>
+                                <div class="o_sidebar_card">
+                                    <strong>Disponible en vivo</strong>
+                                    <p id="availability_feedback">Selecciona fecha, hora y zona para ver mesas.</p>
+                                    <p id="reservation_window_feedback" class="text-muted mb-0"></p>
+                                </div>
+                            </aside>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            
+            <script type="text/javascript">
+                document.addEventListener("DOMContentLoaded", function() {
+                    /* Solo mantenemos aquí el bloqueo de fechas pasadas */
+                    var dateInput = document.getElementById('date');
+                    if (dateInput) {
+                        var today = new Date();
+                        today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
+                        var todayString = today.toISOString().split('T')[0];
+                        dateInput.setAttribute('min', todayString);
+                    }
+                });
+            </script>
+        </t>
+    </template>
+
+    <record id="website_menu_reservas_restaurante" model="website.menu">
+        <field name="name">Reservas</field>
+        <field name="url">/reservas</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" eval="45"/>
+    </record>
+</odoo>
