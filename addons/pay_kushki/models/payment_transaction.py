@@ -12,7 +12,7 @@ import json
 
 _logger = logging.getLogger(__name__)
 
-
+# Transactions
 class PaymentTransaction(models.Model):
     _inherit = 'payment.transaction'
 
