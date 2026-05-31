@@ -10,7 +10,7 @@ from .. import const
 
 _logger = logging.getLogger(__name__)
 
-
+#Metodo que hace la herencia del modelo de proveedor de pago para agregar los campos necesarios para kushki, ademas de agregar los metodos necesarios para el manejo de las transacciones de pago con kushki
 class PaymentProvider(models.Model):
     _inherit = 'payment.provider'
 
