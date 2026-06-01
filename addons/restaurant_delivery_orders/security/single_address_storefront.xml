@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Storefront de delivery: una sola direccion (billing == shipping).
+
+        Por defecto, website_sale agrega 'account.group_delivery_invoice_address'
+        a public y portal users, lo que hace que el checkout muestre dos cards
+        (facturacion + envio). Para este restaurante el cliente B2C usa una
+        sola direccion, asi que removemos el grupo de esos dos grupos.
+
+        Los internal users (base.group_user) conservan el grupo para no
+        afectar la funcionalidad del backend (sale.order, facturacion B2B).
+    -->
+    <record id="base.group_public" model="res.groups">
+        <field name="implied_ids" eval="[
+            Command.unlink(ref('account.group_delivery_invoice_address')),
+        ]"/>
+    </record>
+
+    <record id="base.group_portal" model="res.groups">
+        <field name="implied_ids" eval="[
+            Command.unlink(ref('account.group_delivery_invoice_address')),
+        ]"/>
+    </record>
+</odoo>

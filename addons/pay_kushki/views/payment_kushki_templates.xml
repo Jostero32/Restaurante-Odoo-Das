@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="redirect_form">
+        <form id="kushki-form" class="kushki-form" t-att-action="url" method="post" style="margin: auto; width: 400px;">
+            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+            <input type="hidden" name="kushki_publicmerchantmd" t-att-value="kushki_publicmerchantmd"/>
+            <input type="hidden" name="kushki_privatemerchantmd" t-att-value="kushki_privatemerchantmd"/>
+            <input type="hidden" name="kushki_kformid" t-att-value="kushki_kformid"/>
+            <input type="hidden" name="kushki_intestenvironment" t-att-value="kushki_intestenvironment"/>
+            <input type="hidden" name="kushki_url" t-att-value="kushki_url"/>
+            <input type="hidden" name="kushki_sitedomain" t-att-value="kushki_sitedomain"/>
+            <input type="hidden" name="kushki_url_otp" t-att-value="kushki_url_otp"/>
+
+            <input type="hidden" name="amount" t-att-value="amount"/>
+            <input type="hidden" name="business" t-att-value="business"/>
+            <input type="hidden" name="city" t-att-value="city"/>
+            <input type="hidden" name="country" t-att-value="country"/>
+            <input type="hidden" name="currency_code" t-att-value="currency_code"/>
+            <input type="hidden" name="email" t-att-value="email"/>
+            <input type="hidden" name="first_name" t-att-value="first_name"/>
+            <input type="hidden" name="item_name" t-att-value="item_name"/>
+            <input type="hidden" name="item_number" t-att-value="item_number"/>
+            <input type="hidden" name="last_name" t-att-value="last_name"/>
+            <input type="hidden" name="lc" t-att-value="lc"/>
+            <input type="hidden" name="state" t-att-value="state"/>
+            <input type="hidden" name="zip_code" t-att-value="zip_code"/>
+            <input type="hidden" name="phone" t-att-value="phone"/>
+            <input type="hidden" name="street" t-att-value="street"/>
+            <input type="hidden" name="street2" t-att-value="street2"/>
+            <input type="hidden" name="nif" t-att-value="nif"/>
+
+            <input type="hidden" name="payment_transaction_id" t-att-value="payment_transaction_id"/>
+            <input type="hidden" name="lines" t-att-value="lines"/>
+        </form>
+    </template>
+
+    <template id="kushki">
+        <t t-call="portal.portal_layout">
+
+            <t t-set="no_breadcrumbs" t-value="True"/>
+            <nav aria-label="breadcrumb" class="navbar navbar-light navbar-expand-lg border py-0 mb-2 o_portal_navbar  mt-3 rounded">
+                <ol class="o_portal_submenu breadcrumb mb-0 py-2 flex-grow-1">
+                    <li class="breadcrumb-item">
+                        <a href="/shop/payment"><i class="fa fa-home"></i></a>
+                    </li>
+                    <li class="breadcrumb-item">Payment online</li>
+                </ol>
+            </nav>
+
+            <t t-set="title">Payment online</t>
+            <div class="oe_structure">
+                <div class="container" style="text-align: center;">
+                    <br />
+
+                    <div id="public_key" style="display: none;"><t t-esc="kushki_publicmerchantmd"/></div>
+                    <div id="test_environment" style="display: none;"><t t-esc="kushki_intestenvironment"/></div>
+                    <div id="kushki_kformid" style="display: none;"><t t-esc="kushki_kformid"/></div>
+                    <div id="id_total" style="display: none;"><t t-esc="amount"/></div>
+                    <div id="id_url" style="display: none;"><t t-esc="url"/></div>
+
+                    <h2>Pay with kushki</h2>
+                    <div class="form-group" style="text-align: center;">
+                        <form id="kushki-form" class="kushki-form" t-att-action="url" method="post" style="margin: auto; width: 400px;">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="cart_id" value="123"/>
+
+                            <input type="hidden" name="amount" t-att-value="amount"/>
+                            <input type="hidden" name="business" t-att-value="business"/>
+                            <input type="hidden" name="city" t-att-value="city"/>
+                            <input type="hidden" name="country" t-att-value="country"/>
+                            <input type="hidden" name="currency_code" t-att-value="currency_code"/>
+                            <input type="hidden" name="email" t-att-value="email"/>
+                            <input type="hidden" name="first_name" t-att-value="first_name"/>
+                            <input type="hidden" name="item_name" t-att-value="item_name"/>
+                            <input type="hidden" name="item_number" t-att-value="item_number"/>
+                            <input type="hidden" name="last_name" t-att-value="last_name"/>
+                            <input type="hidden" name="lc" t-att-value="lc"/>
+                            <input type="hidden" name="state" t-att-value="state"/>
+                            <input type="hidden" name="zip_code" t-att-value="zip_code"/>
+                            <input type="hidden" name="phone" t-att-value="phone"/>
+                            <input type="hidden" name="street" t-att-value="street"/>
+                            <input type="hidden" name="street2" t-att-value="street2"/>
+                            <input type="hidden" name="nif" t-att-value="nif"/>
+
+                            <input type="hidden" name="payment_transaction_id" t-att-value="payment_transaction_id"/>
+                            <input type="hidden" name="lines" t-att-value="lines"/>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="kushki_result">
+        <t t-call="portal.portal_layout">
+
+            <t t-set="head">
+                 <script>
+                    function printDiv(divName) {
+                         var printContents = document.getElementById(divName).innerHTML;
+                         var originalContents = document.body.innerHTML;
+
+                         document.body.innerHTML = printContents;
+
+                         window.print();
+
+                         document.body.innerHTML = originalContents;
+                    }
+                 </script>
+            </t>
+
+            <t t-set="no_breadcrumbs" t-value="True"/>
+            <nav aria-label="breadcrumb" class="navbar navbar-light navbar-expand-lg border py-0 mb-2 o_portal_navbar  mt-3 rounded">
+                <ol class="o_portal_submenu breadcrumb mb-0 py-2 flex-grow-1">
+                    <li class="breadcrumb-item">
+                        <a href="/shop"><i class="fa fa-home"></i></a>
+                    </li>
+                    <li class="breadcrumb-item">Online Payment</li>
+                </ol>
+            </nav>
+
+            <!-- Variables seguras con valores por defecto -->
+            <t t-set="details" t-value="(response_text or {}).get('details', {})"/>
+            <t t-set="bin_info" t-value="details.get('binInfo', {})"/>
+            <t t-set="amount_info" t-value="details.get('amount', {})"/>
+
+            <div id="kushki_result" class="card text-white mb-3 d-flex justify-content-center" style="max-width: 40rem;">
+                <div id="printer">
+                    <img class="card-img-top" src="/pay_kushki/static/src/img/kushki.png" alt="Kushki Payment"/>
+                    <div t-attf-class="card-header #{ 'bg-primary' if ticket else 'bg-warning' }">
+                      <div>
+                        <b>PAYMENT SUMMARY</b>
+                      </div>
+                      <div>
+                        TOTAL: <t t-esc="details.get('requestAmount', '0.00')"/> <t t-esc="amount_info.get('currency', '')"/>
+                      </div>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                      <li class="list-group-item">
+                          <div class="card-body text-dark">
+                            <h5 class="card-title">Details of payment</h5>
+                            <ul>
+                                <li class="card-text">Date: <t t-esc="date"/></li>
+                                <li class="card-text">Card: <t t-esc="bin_info.get('binCard', '-')"/></li>
+                                <li class="card-text">Cardholder: <t t-esc="details.get('cardHolderName', '-')"/></li>
+                                <li t-if="bin_info.get('bank', False)" class="card-text">Bank: <t t-esc="bin_info.get('bank')"/></li>
+                                <li t-if="ticket" class="card-text">Country: <t t-esc="bin_info.get('cardCountry', '-')"/></li>
+                                <li class="card-text">Type: <t t-esc="bin_info.get('type', '-')"/></li>
+                                <li class="card-text">Brand: <t t-esc="details.get('paymentBrand', '-')"/></li>
+                            </ul>
+                          </div>
+                      </li>
+                      <li class="list-group-item">
+                          <div class="card-body text-dark">
+                            <h5 class="card-title">Payment status</h5>
+                            <ul>
+                                <li t-attf-class="card-text #{ 'text-success' if ticket else 'text-warning' }">
+                                    Response: <t t-esc="details.get('responseText', (response_text or {}).get('message', 'Sin respuesta'))"/>
+                                </li>
+                                <li class="card-text">ID: <t t-esc="details.get('transactionId', '-')"/></li>
+                                <li class="card-text">Reference: <t t-esc="(response_text or {}).get('transactionReference', '-')"/></li>
+                                <li t-if="ticket" class="card-text">Ticket: <t t-esc="(response_text or {}).get('ticketNumber', '-')"/></li>
+                            </ul>
+                          </div>
+                      </li>
+                    </ul>
+                </div>
+                <div class="card-footer">
+                  <input type="button" class="btn btn-primary" onclick="printDiv('printer')" value="Print" />
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

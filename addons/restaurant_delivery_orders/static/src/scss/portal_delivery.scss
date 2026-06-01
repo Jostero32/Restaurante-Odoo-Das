@@ -8,6 +8,36 @@
     box-shadow: 0 0.75rem 1.5rem rgba(17, 24, 39, 0.15) !important;
 }
 
+.rcv-portal-metrics .rcv-metric-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #ffffff;
+    padding: 0.75rem 0.8rem;
+    min-height: 104px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.rcv-metric-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #6b7280;
+    font-weight: 600;
+}
+
+.rcv-metric-value {
+    font-size: 1.45rem;
+    color: #111827;
+    line-height: 1.1;
+}
+
+.rcv-metric-help {
+    color: #6b7280;
+    font-size: 0.8rem;
+}
+
 .rcv-pill {
     display: inline-flex;
     align-items: center;
@@ -34,6 +64,14 @@
     border: 1px solid #e5e7eb;
     border-radius: 10px;
     background: #f9fafb;
+}
+
+.rcv-invoice-card {
+    border-radius: 14px;
+}
+
+.rcv-invoice-card .btn {
+    min-width: 112px;
 }
 
 .rcv-delivery-detail .rcv-detail-hero {
@@ -120,8 +158,71 @@
     background: #ffffff;
 }
 
+.rcv-invoice-breakdown {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.rcv-breakdown-row {
+    padding: 0.7rem 0.9rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.6rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.rcv-breakdown-row:last-child {
+    border-bottom: 0;
+}
+
+.rcv-breakdown-total {
+    background: #111827;
+    color: #ffffff;
+}
+
+.rcv-related-order {
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 0.65rem 0.75rem;
+    background: #ffffff;
+}
+
+.rcv-related-order:hover {
+    border-color: #d1d5db;
+    background: #f9fafb;
+}
+
 @media (max-width: 991px) {
     .rcv-kpi {
         min-height: auto;
     }
+
+    .rcv-invoice-card .btn {
+        min-width: auto;
+    }
+}
+
+.rcv-stars {
+    direction: ltr;
+    user-select: none;
+}
+.rcv-stars .rcv-star-label {
+    cursor: pointer;
+    color: #cbd5e1 !important;
+    transition: color 0.12s ease, transform 0.12s ease;
+}
+.rcv-stars .rcv-star-label:hover {
+    transform: scale(1.08);
+}
+.rcv-stars .rcv-star-input:checked ~ .rcv-star-label,
+.rcv-stars .rcv-star-label:hover,
+.rcv-stars .rcv-star-label:hover ~ .rcv-star-label {
+    color: #f59e0b !important;
+}
+.rcv-stars .rcv-star-input:focus-visible ~ .rcv-star-label {
+    outline: 2px solid #4338ca;
+    outline-offset: 2px;
+    border-radius: 4px;
 }

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_restaurant_delivery_rating_list" model="ir.ui.view">
+        <field name="name">restaurant.delivery.rating.list</field>
+        <field name="model">restaurant.delivery.rating</field>
+        <field name="arch" type="xml">
+            <list string="Calificaciones delivery" create="false" delete="false"
+                  decoration-success="score_int &gt;= 4"
+                  decoration-warning="score_int == 3"
+                  decoration-danger="score_int &lt;= 2">
+                <field name="rated_at"/>
+                <field name="delivery_order_id"/>
+                <field name="partner_id"/>
+                <field name="driver_id"/>
+                <field name="score" widget="priority"/>
+                <field name="score_int" string="Puntos"/>
+                <field name="comment" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_restaurant_delivery_rating_form" model="ir.ui.view">
+        <field name="name">restaurant.delivery.rating.form</field>
+        <field name="model">restaurant.delivery.rating</field>
+        <field name="arch" type="xml">
+            <form string="Calificacion" create="false" delete="false">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="delivery_order_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="driver_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="score" widget="priority"/>
+                            <field name="rated_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <separator string="Comentario"/>
+                    <field name="comment" readonly="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_restaurant_delivery_rating_pivot" model="ir.ui.view">
+        <field name="name">restaurant.delivery.rating.pivot</field>
+        <field name="model">restaurant.delivery.rating</field>
+        <field name="arch" type="xml">
+            <pivot string="Calificaciones promedio">
+                <field name="driver_id" type="row"/>
+                <field name="score_int" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="action_restaurant_delivery_ratings" model="ir.actions.act_window">
+        <field name="name">Calificaciones</field>
+        <field name="res_model">restaurant.delivery.rating</field>
+        <field name="view_mode">list,pivot,form</field>
+        <field name="groups_id" eval="[(6, 0, [ref('restaurant_casa_vieja_base.group_restaurant_administracion'), ref('restaurant_casa_vieja_base.group_restaurant_administrador')])]"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Aun no hay calificaciones registradas.
+            </p>
+            <p>
+                Cuando un cliente califique un pedido entregado desde su portal, aparecera aqui.
+            </p>
+        </field>
+    </record>
+</odoo>

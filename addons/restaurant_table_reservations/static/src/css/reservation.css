@@ -1,0 +1,103 @@
+.o_reservation_page {
+    background: linear-gradient(180deg, #f7f2eb 0%, #ffffff 35%);
+    color: #27231f;
+}
+
+.o_reservation_hero {
+    padding: 4.5rem 0 2.5rem;
+    background: radial-gradient(circle at top left, rgba(189, 155, 119, 0.2), transparent 35%),
+        linear-gradient(135deg, #3d332d 0%, #6a5240 100%);
+    color: #fff7ef;
+}
+
+.o_reservation_hero h1 {
+    font-size: clamp(2.5rem, 4vw, 4.25rem);
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.o_reservation_kicker {
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    opacity: 0.85;
+}
+
+.o_reservation_content {
+    margin-top: -1.5rem;
+    padding-bottom: 4rem;
+}
+
+.o_reservation_form,
+.o_reservation_sidebar,
+.o_sidebar_card {
+    border-radius: 1.25rem;
+    background: #fff;
+    box-shadow: 0 1.2rem 3rem rgba(62, 46, 34, 0.08);
+}
+
+.o_reservation_form {
+    padding: 1.5rem;
+}
+
+.o_reservation_sidebar {
+    padding: 1.5rem;
+    position: sticky;
+    top: 1.5rem;
+}
+
+.o_sidebar_card {
+    padding: 1rem;
+    margin-top: 1rem;
+    border: 1px solid rgba(107, 83, 63, 0.1);
+}
+
+.o_table_results {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+    min-height: 3rem;
+}
+
+.o_table_card {
+    border: 1px solid rgba(107, 83, 63, 0.16);
+    border-radius: 1rem;
+    padding: 1rem;
+    background: #fffdf9;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.o_table_card:hover,
+.o_table_card.is-selected {
+    border-color: #b87a4b;
+    box-shadow: 0 1rem 2rem rgba(184, 122, 75, 0.18);
+    transform: translateY(-2px);
+}
+
+.o_table_card_name {
+    font-weight: 700;
+    font-size: 1.05rem;
+}
+
+.o_table_card_meta,
+.o_table_card_notes,
+.o_reservation_summary {
+    font-size: 0.92rem;
+    color: #62584f;
+}
+
+.o_reservation_summary {
+    padding: 0.75rem 1rem;
+    border-radius: 999px;
+    background: #f7efe6;
+}
+
+@media (max-width: 991.98px) {
+    .o_reservation_sidebar {
+        position: static;
+    }
+}

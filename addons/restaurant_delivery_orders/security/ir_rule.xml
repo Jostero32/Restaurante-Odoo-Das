@@ -43,4 +43,15 @@
         <field name="perm_create" eval="0"/>
         <field name="perm_unlink" eval="0"/>
     </record>
+
+    <record id="rule_restaurant_delivery_rating_portal_own" model="ir.rule">
+        <field name="name">Delivery Rating - Portal solo sus calificaciones</field>
+        <field name="model_id" ref="model_restaurant_delivery_rating"/>
+        <field name="domain_force">[('partner_id', 'child_of', [user.commercial_partner_id.id])]</field>
+        <field name="groups" eval="[(4, ref('base.group_portal'))]"/>
+        <field name="perm_read" eval="1"/>
+        <field name="perm_write" eval="0"/>
+        <field name="perm_create" eval="1"/>
+        <field name="perm_unlink" eval="0"/>
+    </record>
 </odoo>

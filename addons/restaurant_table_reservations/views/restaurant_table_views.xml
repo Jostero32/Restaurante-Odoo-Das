@@ -1,30 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_restaurant_table_list" model="ir.ui.view">
-        <field name="name">restaurant.table.list</field>
+    <record id="view_restaurant_table_list_reservations" model="ir.ui.view">
+        <field name="name">restaurant.table.list.reservations</field>
         <field name="model">restaurant.table</field>
+        <field name="priority">50</field>
         <field name="arch" type="xml">
-            <list string="Mesas">
-                <field name="name"/>
-                <field name="capacity"/>
-                <field name="zone"/>
+            <list string="Mesas del Restaurante">
+                <field name="table_number" string="N° Mesa"/>
+                <field name="seats" string="Capacidad"/>
+                <field name="floor_id" string="Piso"/>
+                <field name="zone" string="Zona"/>
+                <field name="current_arrangement" string="Arreglo"/>
                 <field name="active"/>
             </list>
         </field>
     </record>
 
-    <record id="view_restaurant_table_form" model="ir.ui.view">
-        <field name="name">restaurant.table.form</field>
+    <record id="view_restaurant_table_form_reservations" model="ir.ui.view">
+        <field name="name">restaurant.table.form.reservations</field>
         <field name="model">restaurant.table</field>
+        <field name="priority">50</field>
         <field name="arch" type="xml">
             <form string="Mesa">
                 <sheet>
                     <group>
-                        <field name="name"/>
-                        <field name="capacity"/>
-                        <field name="zone"/>
+                        <field name="table_number" string="N° Mesa"/>
+                        <field name="seats" string="Capacidad"/>
+                        <field name="floor_id" string="Piso"/>
+                        <field name="zone" string="Zona"/>
+                        <field name="current_arrangement" string="Arreglo"/>
+                        <field name="shape"/>
                         <field name="active"/>
-                        <field name="notes"/>
                     </group>
                 </sheet>
             </form>
@@ -35,5 +41,11 @@
         <field name="name">Mesas</field>
         <field name="res_model">restaurant.table</field>
         <field name="view_mode">list,form</field>
+        <field name="domain">[('zone', 'in', ['main', 'patio'])]</field>
+        <field name="view_ids" eval="[
+            (5, 0, 0),
+            (0, 0, {'view_mode': 'list', 'view_id': ref('view_restaurant_table_list_reservations')}),
+            (0, 0, {'view_mode': 'form', 'view_id': ref('view_restaurant_table_form_reservations')}),
+        ]"/>
     </record>
 </odoo>

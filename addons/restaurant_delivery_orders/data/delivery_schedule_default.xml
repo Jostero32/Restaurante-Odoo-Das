@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo noupdate="1">
+    <record id="delivery_schedule_default" model="restaurant.delivery.schedule">
+        <field name="company_id" ref="base.main_company"/>
+        <field name="slot_minutes">30</field>
+        <field name="min_lead_time_minutes">30</field>
+        <field name="max_schedule_days">7</field>
+    </record>
+
+    <record id="delivery_schedule_default_line_mon" model="restaurant.delivery.schedule.line">
+        <field name="schedule_id" ref="delivery_schedule_default"/>
+        <field name="day_of_week">0</field>
+        <field name="time_from">11.0</field>
+        <field name="time_to">22.0</field>
+    </record>
+    <record id="delivery_schedule_default_line_tue" model="restaurant.delivery.schedule.line">
+        <field name="schedule_id" ref="delivery_schedule_default"/>
+        <field name="day_of_week">1</field>
+        <field name="time_from">11.0</field>
+        <field name="time_to">22.0</field>
+    </record>
+    <record id="delivery_schedule_default_line_wed" model="restaurant.delivery.schedule.line">
+        <field name="schedule_id" ref="delivery_schedule_default"/>
+        <field name="day_of_week">2</field>
+        <field name="time_from">11.0</field>
+        <field name="time_to">22.0</field>
+    </record>
+    <record id="delivery_schedule_default_line_thu" model="restaurant.delivery.schedule.line">
+        <field name="schedule_id" ref="delivery_schedule_default"/>
+        <field name="day_of_week">3</field>
+        <field name="time_from">11.0</field>
+        <field name="time_to">22.0</field>
+    </record>
+    <record id="delivery_schedule_default_line_fri" model="restaurant.delivery.schedule.line">
+        <field name="schedule_id" ref="delivery_schedule_default"/>
+        <field name="day_of_week">4</field>
+        <field name="time_from">11.0</field>
+        <field name="time_to">22.0</field>
+    </record>
+    <record id="delivery_schedule_default_line_sat" model="restaurant.delivery.schedule.line">
+        <field name="schedule_id" ref="delivery_schedule_default"/>
+        <field name="day_of_week">5</field>
+        <field name="time_from">11.0</field>
+        <field name="time_to">22.0</field>
+    </record>
+</odoo>

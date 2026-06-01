@@ -31,6 +31,11 @@ class RestaurantDeliveryOrder(models.Model):
         tracking=True,
     )
     eta_minutes = fields.Integer(string="ETA minutos", default=35, tracking=True)
+    estimated_delivery_datetime = fields.Datetime(
+        string="Estimated delivery datetime",
+        compute="_compute_estimated_delivery_datetime",
+        store=True,
+    )
     amount_total = fields.Monetary(string="Total", currency_field="currency_id", tracking=True)
     company_id = fields.Many2one(
         "res.company",
@@ -43,6 +48,14 @@ class RestaurantDeliveryOrder(models.Model):
         string="Moneda",
         default=lambda self: self.env.company.currency_id,
         required=True,
+    )
+    delivery_user_id = fields.Many2one("res.users", string="Repartidor", tracking=True)
+    driver_id = fields.Many2one(
+        "res.users",
+        string="Repartidor",
+        related="delivery_user_id",
+        readonly=False,
+        store=False,
     )
     notes = fields.Text(string="Notas")
     state = fields.Selection(
@@ -66,6 +79,19 @@ class RestaurantDeliveryOrder(models.Model):
         copy=False,
         tracking=True,
     )
+    is_scheduled = fields.Boolean(
+        string="Programado",
+        default=False,
+        copy=False,
+        tracking=True,
+        help="Indica si el cliente eligio una hora especifica de entrega.",
+    )
+    scheduled_for = fields.Datetime(
+        string="Programado para",
+        copy=False,
+        tracking=True,
+        help="Hora especifica solicitada por el cliente para la entrega.",
+    )
     product_summary = fields.Text(string="Productos del pedido", compute="_compute_product_summary")
     linked_invoice_ids = fields.Many2many(
         "account.move",
@@ -87,8 +113,41 @@ class RestaurantDeliveryOrder(models.Model):
         "delivery_order_id",
         string="Incidencias",
     )
+    customer_rating_ids = fields.One2many(
+        "restaurant.delivery.rating",
+        "delivery_order_id",
+        string="Calificacion",
+    )
+    rating_score = fields.Integer(
+        string="Calificacion (estrellas)",
+        compute="_compute_rating_summary",
+        store=True,
+    )
+    rating_comment = fields.Text(
+        string="Comentario del cliente",
+        compute="_compute_rating_summary",
+        store=True,
+    )
+    has_rating = fields.Boolean(
+        string="Tiene calificacion",
+        compute="_compute_rating_summary",
+        store=True,
+    )
     incident_count = fields.Integer(string="Total incidencias", compute="_compute_incident_count")
     customer_status_label = fields.Char(string="Estado para cliente", compute="_compute_customer_status_label")
+    display_state_key = fields.Char(
+        string="Estado visual",
+        compute="_compute_display_state",
+        help="Estado visible para cliente y operativo. Distingue pedidos programados aun no en preparacion.",
+    )
+    scheduled_for_display = fields.Char(
+        string="Programado para (texto)",
+        compute="_compute_scheduled_for_display",
+    )
+    scheduled_lead_minutes = fields.Integer(
+        string="Minutos hasta la entrega programada",
+        compute="_compute_scheduled_for_display",
+    )
 
     @api.model
     def _driver_domain(self):
@@ -116,6 +175,14 @@ class RestaurantDeliveryOrder(models.Model):
     def _compute_incident_count(self):
         for order in self:
             order.incident_count = len(order.incident_ids)
+
+    @api.depends("customer_rating_ids.score_int", "customer_rating_ids.comment")
+    def _compute_rating_summary(self):
+        for order in self:
+            rating = order.customer_rating_ids[:1]
+            order.has_rating = bool(rating)
+            order.rating_score = rating.score_int if rating else 0
+            order.rating_comment = rating.comment if rating else ""
 
     @api.depends(
         "sale_order_id",
@@ -168,7 +235,15 @@ class RestaurantDeliveryOrder(models.Model):
             order.invoice_paid_count = len(paid_invoices)
             order.invoice_residual_amount = sum(posted_invoices.mapped("amount_residual")) if posted_invoices else 0.0
 
-    def _get_customer_state_label(self, state_value=None):
+    _PREP_LEAD_MINUTES = 90  # umbral para distinguir "programado" de "en preparacion"
+
+    def _get_customer_state_label(self, state_value=None, display_key=None):
+        # Si tenemos display_key explicito (p.ej. scheduled_received), prevalece.
+        scheduled_mapping = {
+            "scheduled_received": _("Pedido recibido"),
+        }
+        if display_key in scheduled_mapping:
+            return scheduled_mapping[display_key]
         mapping = {
             "draft": _("En preparacion"),
             "confirmed": _("En preparacion"),
@@ -179,10 +254,70 @@ class RestaurantDeliveryOrder(models.Model):
         }
         return mapping.get(state_value or self.state, _("En proceso"))
 
-    @api.depends("state")
+    @api.depends("state", "is_scheduled", "scheduled_for")
+    def _compute_display_state(self):
+        now = fields.Datetime.now()
+        for order in self:
+            order.display_state_key = order._resolve_display_state_key(now)
+
+    def _resolve_display_state_key(self, now=None):
+        self.ensure_one()
+        now = now or fields.Datetime.now()
+        if self.state in {"on_route", "delivered", "cancelled"}:
+            return self.state
+        if self.is_scheduled and self.scheduled_for and self.state in {"draft", "confirmed"}:
+            delta = (self.scheduled_for - now).total_seconds() / 60.0
+            if delta > self._PREP_LEAD_MINUTES:
+                return "scheduled_received"
+        return self.state
+
+    @api.depends("state", "is_scheduled", "scheduled_for", "display_state_key")
     def _compute_customer_status_label(self):
         for order in self:
-            order.customer_status_label = order._get_customer_state_label(order.state)
+            order.customer_status_label = order._get_customer_state_label(
+                order.state, display_key=order.display_state_key
+            )
+
+    @api.depends("is_scheduled", "scheduled_for")
+    def _compute_scheduled_for_display(self):
+        now = fields.Datetime.now()
+        for order in self:
+            if not order.is_scheduled or not order.scheduled_for:
+                order.scheduled_for_display = ""
+                order.scheduled_lead_minutes = 0
+                continue
+            delta_seconds = (order.scheduled_for - now).total_seconds()
+            order.scheduled_lead_minutes = int(delta_seconds / 60)
+            order.scheduled_for_display = order._format_scheduled_for(now)
+
+    def _format_scheduled_for(self, now=None):
+        self.ensure_one()
+        if not self.scheduled_for:
+            return ""
+        now = now or fields.Datetime.now()
+        schedule = self.env["restaurant.delivery.schedule"].sudo()._get_or_create_for_company(self.company_id)
+        local_when = schedule._to_company_local(self.scheduled_for)
+        local_now = schedule._to_company_local(now)
+        delta_days = (local_when.date() - local_now.date()).days
+        time_part = local_when.strftime("%H:%M")
+        if delta_days == 0:
+            day_part = _("hoy")
+        elif delta_days == 1:
+            day_part = _("manana")
+        elif 1 < delta_days <= 6:
+            day_names = [
+                _("lunes"), _("martes"), _("miercoles"), _("jueves"),
+                _("viernes"), _("sabado"), _("domingo"),
+            ]
+            day_part = _("%(day)s (en %(n)s dias)") % {
+                "day": day_names[local_when.weekday()],
+                "n": delta_days,
+            }
+        elif delta_days < 0:
+            day_part = local_when.strftime("%d/%m")
+        else:
+            day_part = local_when.strftime("%d/%m")
+        return _("%(day)s a las %(time)s") % {"day": day_part, "time": time_part}
 
     def _compute_access_url(self):
         super()._compute_access_url()
@@ -208,11 +343,30 @@ class RestaurantDeliveryOrder(models.Model):
                     "Nuevo pedido"
                 )
         orders = super().create(vals_list)
+        orders._sync_chat_followers()
         if not self.env.context.get("skip_delivery_customer_notify"):
             orders._notify_customer_status_change(force_states={"confirmed", "assigned", "on_route"})
         if not self.env.context.get("skip_delivery_internal_notify"):
             orders._notify_internal_new_website_order()
         return orders
+
+    def _sync_chat_followers(self, previous_driver_by_order=None):
+        previous_driver_by_order = previous_driver_by_order or {}
+        for order in self:
+            partner_ids_to_add = []
+            customer_partner = order.partner_id and order.partner_id.commercial_partner_id
+            if customer_partner and customer_partner not in order.message_partner_ids:
+                partner_ids_to_add.append(customer_partner.id)
+            if order.driver_id and order.driver_id.partner_id:
+                if order.driver_id.partner_id not in order.message_partner_ids:
+                    partner_ids_to_add.append(order.driver_id.partner_id.id)
+            if partner_ids_to_add:
+                order.sudo().message_subscribe(partner_ids=list(set(partner_ids_to_add)))
+            previous_driver = previous_driver_by_order.get(order.id)
+            if previous_driver and order.driver_id and previous_driver != order.driver_id:
+                stale_partner = previous_driver.partner_id
+                if stale_partner and stale_partner != customer_partner:
+                    order.sudo().message_unsubscribe(partner_ids=[stale_partner.id])
 
     def _notify_internal_new_website_order(self):
         website_orders = self.filtered(lambda order: order.sale_order_id and order.sale_order_id.website_id)
@@ -226,6 +380,7 @@ class RestaurantDeliveryOrder(models.Model):
         users = self.env["res.users"]
         for group_xmlid in [
             "restaurant_casa_vieja_base.group_restaurant_cocinero",
+            "restaurant_casa_vieja_base.group_restaurant_mesero",
             "restaurant_casa_vieja_base.group_restaurant_repartidor",
             "restaurant_casa_vieja_base.group_restaurant_administracion",
             "restaurant_casa_vieja_base.group_restaurant_administrador",
@@ -237,17 +392,38 @@ class RestaurantDeliveryOrder(models.Model):
             return
 
         model_id = self.env["ir.model"]._get_id("restaurant.delivery.order")
-        deadline = fields.Date.context_today(self)
+        today = fields.Date.context_today(self)
         activity_vals = []
         for order in website_orders:
-            order.sudo().message_post(
-                body=_(
-                    "Nuevo pedido web confirmado. Estado operativo: En preparacion. "
-                    "Revisar alistamiento y asignacion de ruta."
-                ),
-                message_type="comment",
-                subtype_xmlid="mail.mt_note",
-            )
+            display_key = order._resolve_display_state_key()
+            if display_key == "scheduled_received":
+                schedule_text = order.scheduled_for_display or ""
+                order.sudo().message_post(
+                    body=_(
+                        "Nuevo pedido web PROGRAMADO para %s. "
+                        "El alistamiento se programa para el dia de la entrega."
+                    ) % (schedule_text,),
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_note",
+                )
+                deadline = fields.Date.to_date(order.scheduled_for) if order.scheduled_for else today
+                summary = _("Pedido programado para %s") % (schedule_text,)
+                note = _(
+                    "Pedido %(name)s programado por el cliente para %(when)s. "
+                    "Alistar a tiempo para esa hora."
+                ) % {"name": order.name, "when": schedule_text}
+            else:
+                order.sudo().message_post(
+                    body=_(
+                        "Nuevo pedido web confirmado. Estado operativo: En preparacion. "
+                        "Revisar alistamiento y asignacion de ruta."
+                    ),
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_note",
+                )
+                deadline = today
+                summary = _("Nuevo pedido web en preparacion")
+                note = _("Pedido %s listo para alistar y despachar.") % (order.name,)
             for user in users:
                 activity_vals.append(
                     {
@@ -255,8 +431,8 @@ class RestaurantDeliveryOrder(models.Model):
                         "res_model_id": model_id,
                         "res_id": order.id,
                         "user_id": user.id,
-                        "summary": _("Nuevo pedido web en preparacion"),
-                        "note": _("Pedido %s listo para alistar y despachar.") % (order.name,),
+                        "summary": summary,
+                        "note": note,
                         "date_deadline": deadline,
                     }
                 )
@@ -265,6 +441,8 @@ class RestaurantDeliveryOrder(models.Model):
 
     def write(self, vals):
         previous_states = {order.id: order.state for order in self}
+        previous_drivers = {order.id: order.driver_id for order in self}
+        previous_partners = {order.id: order.partner_id for order in self}
         if self._is_repartidor_only_user():
             allowed_fields = {"state", "notes"}
             forbidden_fields = set(vals) - allowed_fields
@@ -278,6 +456,12 @@ class RestaurantDeliveryOrder(models.Model):
         if "state" in vals:
             changed = self.filtered(lambda order: previous_states.get(order.id) != order.state)
             changed._notify_customer_status_change()
+        followers_changed = self.filtered(
+            lambda order: previous_drivers.get(order.id) != order.driver_id
+            or previous_partners.get(order.id) != order.partner_id
+        )
+        if followers_changed:
+            followers_changed._sync_chat_followers(previous_driver_by_order=previous_drivers)
         return result
 
     def unlink(self):
@@ -294,16 +478,50 @@ class RestaurantDeliveryOrder(models.Model):
             if order.state not in {"confirmed", "assigned", "on_route", "delivered", "cancelled"} and order.state not in force_states:
                 continue
             partner = order.partner_id or order.sale_order_id.partner_id
-            if not partner or not partner.email:
-                continue
-            email_values = {"email_to": partner.email}
-            if template:
-                template.sudo().send_mail(order.id, force_send=False, email_values=email_values)
+            if partner and partner.email:
+                email_values = {"email_to": partner.email}
+                if template:
+                    template.sudo().send_mail(order.id, force_send=False, email_values=email_values)
+            customer_label = order._get_customer_state_label(order.state, display_key=order.display_state_key)
+            public_body = order._customer_chat_message_for_state(customer_label)
+            if public_body:
+                order.sudo().message_post(
+                    body=public_body,
+                    message_type="comment",
+                    subtype_xmlid="mail.mt_comment",
+                )
             order.message_post(
-                body=_("Actualizacion de estado enviada al cliente: %s", order._get_customer_state_label()),
+                body=_("Actualizacion de estado enviada al cliente: %s") % (customer_label,),
                 message_type="comment",
                 subtype_xmlid="mail.mt_note",
             )
+
+    def _customer_chat_message_for_state(self, customer_label):
+        self.ensure_one()
+        if self.state == "on_route":
+            if self.driver_id:
+                return _("Tu pedido va en camino con %s (repartidor). Coordina con el desde este chat si necesitas algo.") % (
+                    self.driver_id.name,
+                )
+            return _("Tu pedido va en camino.")
+        if self.state == "delivered":
+            return _(
+                "Tu pedido fue entregado. Gracias por preferirnos! "
+                "Si quieres, calificalo desde la seccion de calificacion en esta misma pagina."
+            )
+        if self.state == "cancelled":
+            return _("Tu pedido fue cancelado. Si tienes dudas, escribenos por este chat.")
+        if self.state == "assigned":
+            if self.driver_id:
+                return _("Asignamos a %s como repartidor. Esta saliendo en breve.") % (self.driver_id.name,)
+            return _("Asignamos un repartidor para tu pedido.")
+        if self.display_state_key == "scheduled_received":
+            return _("Recibimos tu pedido programado para %s. Te avisamos cuando inicie la preparacion.") % (
+                self.scheduled_for_display,
+            )
+        if self.state == "confirmed":
+            return _("Confirmamos tu pedido. Lo estamos preparando.")
+        return ""
 
     @api.model
     def _disable_ecommerce_terms_block(self):
@@ -340,6 +558,34 @@ class RestaurantDeliveryOrder(models.Model):
         users_in_both = admin_group.users & repartidor_group.users
         if users_in_both:
             users_in_both.write({"groups_id": [(3, repartidor_group.id)]})
+
+    @api.model
+    def _enforce_single_address_storefront(self):
+        # Storefront de delivery usa una sola direccion. El XML de seguridad
+        # ya quita el grupo 'Delivery Address' de public/portal a futuro,
+        # pero los usuarios existentes lo retienen por el many2many users.
+        # Aqui los limpiamos, preservando internal users (backend).
+        delivery_addr_group = self.env.ref(
+            "account.group_delivery_invoice_address", raise_if_not_found=False
+        )
+        if not delivery_addr_group:
+            return
+        public_group = self.env.ref("base.group_public", raise_if_not_found=False)
+        portal_group = self.env.ref("base.group_portal", raise_if_not_found=False)
+        internal_group = self.env.ref("base.group_user", raise_if_not_found=False)
+        if not internal_group or not (public_group or portal_group):
+            return
+        candidate_users = self.env["res.users"]
+        if public_group:
+            candidate_users |= public_group.sudo().users
+        if portal_group:
+            candidate_users |= portal_group.sudo().users
+        candidate_users -= internal_group.sudo().users
+        users_to_clean = candidate_users & delivery_addr_group.sudo().users
+        if users_to_clean:
+            delivery_addr_group.sudo().write(
+                {"users": [(3, user.id) for user in users_to_clean]}
+            )
 
     @api.model
     def _update_menu_groups(self, menu_xmlid, add_group_xmlids=None, remove_group_xmlids=None, replace_group_xmlids=None):
@@ -408,6 +654,15 @@ class RestaurantDeliveryOrder(models.Model):
             if order.eta_minutes < 0:
                 raise ValidationError(_("El ETA no puede ser negativo."))
 
+    @api.constrains("is_scheduled", "scheduled_for")
+    def _check_scheduled_for(self):
+        for order in self:
+            if order.is_scheduled and not order.scheduled_for:
+                raise ValidationError(_("Marco el pedido como programado pero no indico hora."))
+            if order.scheduled_for and not order.is_scheduled:
+                # Tolerar pedidos historicos sin la bandera, no levantar.
+                continue
+
     @api.constrains("driver_id")
     def _check_driver_role(self):
         repartidor_group = self.env.ref("restaurant_casa_vieja_base.group_restaurant_repartidor", raise_if_not_found=False)
@@ -454,6 +709,9 @@ class RestaurantDeliveryOrder(models.Model):
         if invalid:
             raise UserError(_("Solo se pueden entregar pedidos en ruta."))
         self.write({"state": "delivered"})
+        sale_orders = self.sudo().mapped("sale_order_id").filtered(lambda order: order.state != "cancel")
+        if sale_orders:
+            sale_orders.with_context(skip_delivery_sync=True).action_finalize_delivery_invoicing()
 
     def action_cancel(self):
         if self._is_repartidor_only_user():
@@ -462,3 +720,22 @@ class RestaurantDeliveryOrder(models.Model):
         if delivered:
             raise UserError(_("No puede cancelar un pedido entregado."))
         self.write({"state": "cancelled"})
+
+    @api.depends('order_datetime', 'eta_minutes')
+    def _compute_estimated_delivery_datetime(self):
+        for order in self:
+            if order.order_datetime and order.eta_minutes is not None:
+                try:
+                    # order_datetime is a datetime string in UTC-aware fields
+                    order_dt = fields.Datetime.from_string(order.order_datetime)
+                except Exception:
+                    order.estimated_delivery_datetime = False
+                    continue
+                # add minutes
+                from datetime import timedelta
+
+                order.estimated_delivery_datetime = fields.Datetime.to_string(
+                    order_dt + timedelta(minutes=order.eta_minutes)
+                )
+            else:
+                order.estimated_delivery_datetime = False

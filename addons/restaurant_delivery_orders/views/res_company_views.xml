@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_company_form_delivery_settings" model="ir.ui.view">
+        <field name="name">res.company.form.delivery.settings</field>
+        <field name="model">res.company</field>
+        <field name="inherit_id" ref="base.view_company_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='currency_id']" position="after">
+                <separator string="Delivery (Ecommerce)"/>
+                <field name="delivery_fixed_fee"/>
+                <field name="delivery_fee_product_id"
+                       options="{'no_create_edit': True}"
+                       context="{'default_type': 'service', 'default_sale_ok': True, 'default_purchase_ok': False}"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>

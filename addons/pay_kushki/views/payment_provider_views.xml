@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="payment_provider_form" model="ir.ui.view">
+        <field name="name">Kushki Provider Form</field>
+        <field name="model">payment.provider</field>
+        <field name="inherit_id" ref="payment.payment_provider_form"/>
+        <field name="arch" type="xml">
+            <group name="provider_credentials" position='inside'>
+                <group invisible="code != 'kushki'">
+                    <field name="kushki_publicmerchantmd"/>
+                    <field name="kushki_privatemerchantmd"/>
+                    <field name="kushki_kformid"/>
+                    <field name="kushki_intestenvironment"/>
+                    <field name="kushki_url"/>
+                    <field name="kushki_sitedomain"/>
+                    <field name="kushki_url_otp"/>
+                </group>
+            </group>
+        </field>
+    </record>
+
+</odoo>
