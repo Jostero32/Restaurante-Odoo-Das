@@ -9,7 +9,7 @@
                         <p class="o_reservation_kicker">Restaurante Casa Vieja</p>
                         <h1>Reserva tu mesa en tiempo real</h1>
                         <p>
-                            Elige si prefieres el salón interior o el patio. La reserva
+                            Elige si prefieres el salon interior o el patio. La reserva
                             bloquea la mesa por 1 hora y 15 minutos, incluyendo margen de salida.
                         </p>
                     </div>
@@ -28,6 +28,7 @@
                             <form action="/reservas/create" method="post" class="o_reservation_form" id="reservation_form">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                 <input type="hidden" name="table_id" id="table_id" t-att-value="selected_table_id or ''"/>
+                                <input type="hidden" name="pre_order_payload" id="pre_order_payload" value="[]"/>
                                 <input t-if="reschedule_from" type="hidden" name="reschedule_from" t-att-value="reschedule_from"/>
 
                                 <div t-if="reschedule_from" class="alert alert-warning d-flex justify-content-between align-items-center gap-2 mb-3">
@@ -82,23 +83,92 @@
                                         </select>
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label" for="arrangement_type">Arreglo Especial para la mesa</label>
-                                        <select id="arrangement_product_id" name="arrangement_product_id" class="form-select">
-                                            <option value="0" t-att-selected="not selected_arrangement_product_id and 'selected' or None">Ninguno</option>
-                                            <t t-foreach="arrangement_options" t-as="opt">
-                                                <option t-att-value="opt['id']" t-att-selected="selected_arrangement_product_id == opt['id'] and 'selected' or None">
-                                                    <t t-esc="opt['label']"/>
-                                                </option>
-                                            </t>
-                                        </select>
-                                        <small class="text-primary mt-1 d-block">El costo del arreglo se añadirá a su cuenta final en el restaurante.</small>
-                                    </div>
-                                    <div class="col-12">
                                         <label class="form-label">Mesa disponible *</label>
                                         <div id="table_results" class="o_table_results"></div>
                                         <small class="text-muted d-block mt-2">
-                                            Cuando cambies fecha, hora, personas o zona, las mesas se actualizan automáticamente.
+                                            Cuando cambies fecha, hora, personas o zona, las mesas se actualizan automaticamente.
                                         </small>
+                                    </div>
+                                    <div class="col-12">
+                                        <details class="o_preorder_section border rounded-3 p-3">
+                                            <summary class="fw-semibold mb-2">Querés una decoración especial para tu mesa? (opcional)</summary>
+                                            <input type="hidden" id="arrangement_product_id" name="arrangement_product_id" t-att-value="selected_arrangement_product_id or '0'"/>
+                                            <p class="text-muted small mb-3">
+                                                Elegí una sola decoración. El costo se suma a tu cuenta final en el restaurante.
+                                            </p>
+                                            <div id="arrangement_catalog" class="o_arrangement_catalog">
+                                                <article class="o_arrangement_card o_arrangement_none"
+                                                         data-product-id="0"
+                                                         t-att-data-selected="'1' if not selected_arrangement_product_id else '0'">
+                                                    <div class="o_arrangement_card_none">
+                                                        <i class="fa fa-times-circle me-2"/>
+                                                        <span class="fw-semibold">Sin decoración</span>
+                                                    </div>
+                                                </article>
+                                                <t t-if="arrangement_options">
+                                                    <t t-foreach="arrangement_options" t-as="opt">
+                                                        <article class="o_arrangement_card"
+                                                                 t-att-data-product-id="opt['id']"
+                                                                 t-att-data-selected="'1' if selected_arrangement_product_id == opt['id'] else '0'">
+                                                            <img t-att-src="opt['image_url']" t-att-alt="opt['name']"/>
+                                                            <div class="o_arrangement_card_body">
+                                                                <h6 t-out="opt['name']"/>
+                                                                <p class="small text-muted mb-1" t-out="opt['description']"/>
+                                                                <span class="fw-semibold text-primary">
+                                                                    +<t t-esc="currency_symbol"/><t t-esc="'%.2f' % opt['price']"/>
+                                                                </span>
+                                                            </div>
+                                                        </article>
+                                                    </t>
+                                                </t>
+                                            </div>
+                                        </details>
+                                    </div>
+                                    <div class="col-12">
+                                        <details class="o_preorder_section border rounded-3 p-3">
+                                            <summary class="fw-semibold mb-2">Quieres adelantar tu pedido? (opcional)</summary>
+                                            <p class="text-muted small mb-3">
+                                                Estos productos se guardan en tu reserva para que la cocina los tenga listos.
+                                                Se cobran en la mesa junto con lo que pidas al sentarte.
+                                            </p>
+                                            <div id="pre_order_catalog" class="o_preorder_catalog">
+                                                <t t-if="pre_order_products">
+                                                    <t t-foreach="pre_order_products" t-as="product">
+                                                        <article class="o_preorder_card"
+                                                                 t-att-data-product-id="product['id']"
+                                                                 t-att-data-product-name="product['name']"
+                                                                 t-att-data-product-price="product['price']"
+                                                                 t-att-data-product-follows-party="'1' if product.get('follows_party_size') else '0'">
+                                                            <img t-att-src="product['image_url']" t-att-alt="product['name']"/>
+                                                            <div class="o_preorder_card_body">
+                                                                <h6 t-out="product['name']"/>
+                                                                <p class="small text-muted mb-2" t-out="product['description']"/>
+                                                                <span t-if="product.get('follows_party_size')" class="badge text-bg-info-subtle text-info-emphasis mb-2 small">
+                                                                    <i class="fa fa-users me-1"/>Por persona
+                                                                </span>
+                                                                <div class="d-flex justify-content-between align-items-center gap-2">
+                                                                    <span class="fw-semibold"><t t-esc="currency_symbol"/><t t-esc="'%.2f' % product['price']"/></span>
+                                                                    <div class="o_preorder_qty_controls">
+                                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="decrease">-</button>
+                                                                        <span class="o_preorder_qty" data-role="qty">0</span>
+                                                                        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="increase">+</button>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="o_preorder_notes mt-2" data-role="notes-wrap" style="display:none;">
+                                                                    <label class="form-label small text-muted mb-1">Personalizacion / instrucciones (opcional)</label>
+                                                                    <textarea class="form-control form-control-sm" rows="2" maxlength="500"
+                                                                              data-role="notes"
+                                                                              placeholder="Ej: 2 con pollo y 1 con lomo, sin gluten, sin cebolla..."/>
+                                                                </div>
+                                                            </div>
+                                                        </article>
+                                                    </t>
+                                                </t>
+                                                <t t-else="">
+                                                    <div class="alert alert-light mb-0">No hay productos habilitados para pre-orden.</div>
+                                                </t>
+                                            </div>
+                                        </details>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label" for="notes">Notas</label>
@@ -109,8 +179,13 @@
                                 <div class="mt-4 d-flex flex-wrap gap-3 align-items-center">
                                     <button type="submit" id="btn_submit_reservation" class="btn btn-primary btn-lg">Reservar ahora</button>
                                     <div class="o_reservation_summary" id="reservation_summary">
-                                        <span>Duración de mesa: 1 hora + 15 minutos de margen.</span>
+                                        <span>Duracion de mesa: 1 hora + 15 minutos de margen.</span>
                                     </div>
+                                </div>
+                                <div id="pre_order_sticky_total" class="o_preorder_total_bar mt-3" style="display:none;">
+                                    <strong>Pre-orden:</strong>
+                                    <span id="pre_order_total_text"><t t-esc="currency_symbol"/>0.00</span>
+                                    <span class="text-muted small ms-2">(estimado, se cobra en mesa)</span>
                                 </div>
                             </form>
                         </div>
@@ -129,10 +204,9 @@
                     </div>
                 </section>
             </div>
-            
+
             <script type="text/javascript">
                 document.addEventListener("DOMContentLoaded", function() {
-                    /* Solo mantenemos aquí el bloqueo de fechas pasadas */
                     var dateInput = document.getElementById('date');
                     if (dateInput) {
                         var today = new Date();

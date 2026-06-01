@@ -10,6 +10,8 @@
                 <field name="customer_phone"/>
                 <field name="party_size"/>
                 <field name="arrangement_product_id"/>
+                <field name="pre_order_total"/>
+                <field name="pre_order_count"/>
                 <field name="zone"/>
                 <field name="table_id"/>
                 <field name="start_datetime"/>
@@ -29,7 +31,7 @@
                     <button name="action_seated" string="Sentar" type="object" class="btn-primary" invisible="state != 'confirmed'"/>
                     <button name="action_done" string="Finalizar" type="object" class="btn-primary" invisible="state != 'seated'"/>
                     <button name="action_cancel" string="Cancelar" type="object" invisible="state in ('seated', 'done', 'cancelled')"/>
-                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,seated,done"/>
+                    <field name="state" widget="statusbar" statusbar_visible="draft,confirmed,seated,done,cancelled"/>
                 </header>
                 <sheet>
                     <group>
@@ -45,9 +47,39 @@
                             <field name="table_id" domain="[('active', '=', True), ('zone', '=', zone), ('seats', '>=', party_size)]"/>
                             <field name="start_datetime"/>
                             <field name="end_datetime" readonly="1"/>
+                            <field name="pre_order_total" readonly="1"/>
+                            <field name="pre_order_count" readonly="1"/>
+                            <field name="pre_order_lines_charged" readonly="1"/>
                         </group>
                     </group>
                     <notebook>
+                        <page string="Pre-orden">
+                            <field name="pre_order_line_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="product_id"/>
+                                    <field name="name"/>
+                                    <field name="qty"/>
+                                    <field name="price_unit"/>
+                                    <field name="price_subtotal" readonly="1"/>
+                                    <field name="notes"/>
+                                </list>
+                                <form>
+                                    <group>
+                                        <group>
+                                            <field name="product_id"/>
+                                            <field name="name"/>
+                                            <field name="qty"/>
+                                        </group>
+                                        <group>
+                                            <field name="price_unit"/>
+                                            <field name="price_subtotal" readonly="1"/>
+                                            <field name="notes"/>
+                                        </group>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
                         <page string="Notas">
                             <field name="notes"/>
                         </page>
@@ -92,6 +124,7 @@
                 ]"/>
                 <filter name="upcoming" string="Proximas" domain="[('start_datetime', '&gt;=', context_today().strftime('%Y-%m-%d 00:00:00')), ('state', 'in', ('draft','confirmed','seated'))]"/>
                 <filter name="active" string="Activas" domain="[('state', 'in', ('draft','confirmed','seated'))]"/>
+                <filter name="with_preorder" string="Con pre-orden" domain="[('pre_order_count', '&gt;', 0)]"/>
                 <separator/>
                 <filter name="group_state" string="Estado" context="{'group_by': 'state'}"/>
                 <filter name="group_zone" string="Zona" context="{'group_by': 'zone'}"/>

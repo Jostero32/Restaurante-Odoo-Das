@@ -12,10 +12,13 @@
         "pos_restaurant",
         "point_of_sale",
         "restaurant_casa_vieja_base",
+        "restaurant_delivery_orders",
     ],
     "data": [
         "security/ir.model.access.csv",
         "security/ir_rule.xml",
+        "data/arrangement_products.xml",
+        "views/product_template_views.xml",
         "views/restaurant_table_views.xml",
         "views/table_reservation_views.xml",
         "views/reservation_website_templates.xml",

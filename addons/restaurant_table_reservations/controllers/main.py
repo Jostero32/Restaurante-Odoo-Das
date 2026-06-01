@@ -15,18 +15,14 @@ class RestaurantTableReservationController(http.Controller):
             return default
 
     def _get_local_tz(self):
-        # 1. Check Odoo context
         tz = request.context.get("tz")
         if tz:
             return tz
-        # 2. Check current user tz
         if request.env.user and request.env.user.tz:
             return request.env.user.tz
-        # 3. Check if any admin or partner has tz configured
         user_with_tz = request.env["res.users"].sudo().search([("tz", "!=", False)], limit=1)
         if user_with_tz:
             return user_with_tz.tz
-        # 4. Fallback
         return "America/Bogota"
 
     def _local_to_utc(self, naive_dt):
@@ -43,6 +39,48 @@ class RestaurantTableReservationController(http.Controller):
             return None
         naive_dt = datetime.strptime(f"{date_value} {time_value}", "%Y-%m-%d %H:%M")
         return self._local_to_utc(naive_dt)
+
+    def _parse_pre_order_payload(self, payload):
+        if not payload:
+            return []
+        try:
+            raw_items = json.loads(payload)
+        except (TypeError, ValueError):
+            raise ValidationError(_("No se pudo procesar la pre-orden enviada."))
+        if not isinstance(raw_items, list):
+            raise ValidationError(_("Formato invalido para la pre-orden."))
+        parsed = []
+        Product = request.env["product.product"].sudo()
+        for item in raw_items:
+            product_id = self._safe_int(item.get("product_id"), 0)
+            try:
+                qty = float(item.get("qty") or 0.0)
+            except (TypeError, ValueError):
+                qty = 0.0
+            notes = (item.get("notes") or "").strip()
+            if not product_id or qty <= 0:
+                continue
+            product = Product.search(
+                [
+                    ("id", "=", product_id),
+                    ("active", "=", True),
+                    ("sale_ok", "=", True),
+                    ("product_tmpl_id.available_for_reservation_preorder", "=", True),
+                ],
+                limit=1,
+            )
+            if not product:
+                raise ValidationError(_("Uno de los productos del pre-pedido ya no esta disponible."))
+            parsed.append(
+                {
+                    "product_id": product.id,
+                    "qty": qty,
+                    "notes": notes[:500],
+                    "price_unit": product.lst_price,
+                    "name": product.display_name,
+                }
+            )
+        return parsed
 
     def _resolve_reschedule_source(self, reschedule_from):
         if not reschedule_from:
@@ -80,6 +118,8 @@ class RestaurantTableReservationController(http.Controller):
             ("patio", "Patio"),
         ]
 
+        schedule_status = reservation_model._get_schedule_status_for_date(kwargs.get("date"))
+
         return {
             "zone_options": zone_options,
             "selected_zone": zone,
@@ -93,6 +133,8 @@ class RestaurantTableReservationController(http.Controller):
             "reservation_window_end": reservation_window_end,
             "reservation_duration_minutes": reservation_model.RESERVATION_MINUTES,
             "reservation_buffer_minutes": reservation_model.BUFFER_MINUTES,
+            "schedule_is_open": schedule_status["is_open"],
+            "schedule_message": schedule_status["message"],
         }
 
     @http.route(["/reservas", "/reservas/mesa"], type="http", auth="user", website=True, sitemap=True)
@@ -111,6 +153,8 @@ class RestaurantTableReservationController(http.Controller):
             {
                 "success_message": request.params.get("success") and _("Su reserva fue enviada correctamente."),
                 "error_message": request.params.get("error"),
+                "pre_order_products": request.env["restaurant.table.reservation"].sudo()._get_pre_order_products(),
+                "currency_symbol": request.env.company.currency_id.symbol or "$",
                 "selected_table_id": self._safe_int(kwargs.get("table_id"), 0),
                 "customer_name": kwargs.get("customer_name") or "",
                 "customer_phone": kwargs.get("customer_phone") or "",
@@ -146,6 +190,8 @@ class RestaurantTableReservationController(http.Controller):
             "selected_zone": context["selected_zone"],
             "selected_party_size": context["selected_party_size"],
             "selected_arrangement_type": context.get("selected_arrangement_type", "none"),
+            "schedule_is_open": context["schedule_is_open"],
+            "schedule_message": context["schedule_message"],
         }
         return request.make_response(json.dumps(payload), headers=[("Content-Type", "application/json")])
 
@@ -161,6 +207,7 @@ class RestaurantTableReservationController(http.Controller):
             table_id = self._safe_int(post.get("table_id"), 0)
             if not table_id:
                 raise ValidationError(_("Debes elegir una mesa disponible."))
+            pre_order_items = self._parse_pre_order_payload(post.get("pre_order_payload"))
 
             partner = request.env.user.partner_id.commercial_partner_id
             reservation_model = request.env["restaurant.table.reservation"].sudo()
@@ -176,10 +223,25 @@ class RestaurantTableReservationController(http.Controller):
                 "notes": post.get("notes") or "",
                 "arrangement_product_id": arrangement_product_id or False,
             }
-            if source:
-                source.action_cancel()
+            if pre_order_items:
+                reservation_vals["pre_order_line_ids"] = [
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": item["product_id"],
+                            "name": item["name"],
+                            "qty": item["qty"],
+                            "notes": item["notes"],
+                            "price_unit": item["price_unit"],
+                        },
+                    )
+                    for item in pre_order_items
+                ]
             reservation = reservation_model.create(reservation_vals)
             reservation.action_confirm()
+            if source:
+                source.action_cancel()
         except (ValidationError, ValueError) as error:
             return request.redirect(f"/reservas?error={quote_plus(str(error))}")
 

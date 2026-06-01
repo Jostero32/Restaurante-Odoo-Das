@@ -2,7 +2,7 @@ from collections import OrderedDict
 
 from odoo import _, http
 from odoo.addons.portal.controllers.portal import CustomerPortal, pager as portal_pager
-from odoo.exceptions import AccessError, MissingError, UserError
+from odoo.exceptions import UserError
 from odoo.http import request
 
 
