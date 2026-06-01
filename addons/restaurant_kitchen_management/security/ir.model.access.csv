@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_kitchen_order_cocinero,kitchen.order.cocinero,model_restaurant_kitchen_order,restaurant_casa_vieja_base.group_restaurant_cocinero,1,1,1,0
+access_kitchen_order_admin,kitchen.order.admin,model_restaurant_kitchen_order,restaurant_casa_vieja_base.group_restaurant_administrador,1,1,1,1
+access_kitchen_line_cocinero,kitchen.order.line.cocinero,model_restaurant_kitchen_order_line,restaurant_casa_vieja_base.group_restaurant_cocinero,1,1,1,0
+access_kitchen_line_admin,kitchen.order.line.admin,model_restaurant_kitchen_order_line,restaurant_casa_vieja_base.group_restaurant_administrador,1,1,1,1

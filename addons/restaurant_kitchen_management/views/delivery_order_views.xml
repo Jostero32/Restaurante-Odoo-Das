@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================ -->
+    <!-- Form: agrega seccion de Cocina al pedido delivery             -->
+    <!-- ============================================================ -->
+    <record id="view_restaurant_delivery_order_form_kitchen" model="ir.ui.view">
+        <field name="name">restaurant.delivery.order.form.kitchen</field>
+        <field name="model">restaurant.delivery.order</field>
+        <field name="inherit_id" ref="restaurant_delivery_orders.view_restaurant_delivery_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='amount_total']" position="after">
+                <field name="kitchen_order_id" readonly="1"/>
+                <field name="kitchen_ready" widget="boolean_toggle" readonly="1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- List: muestra badge "Listo para despacho"                     -->
+    <!-- ============================================================ -->
+    <record id="view_restaurant_delivery_order_list_kitchen" model="ir.ui.view">
+        <field name="name">restaurant.delivery.order.list.kitchen</field>
+        <field name="model">restaurant.delivery.order</field>
+        <field name="inherit_id" ref="restaurant_delivery_orders.view_restaurant_delivery_order_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="before">
+                <field name="kitchen_ready"
+                       widget="boolean_toggle"
+                       string="Cocina lista"
+                       optional="show"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
