@@ -3,7 +3,7 @@
 import { patch } from "@web/core/utils/patch";
 import { ControlButtons } from "@point_of_sale/app/screens/product_screen/control_buttons/control_buttons";
 import { useService } from "@web/core/utils/hooks";
-import { useState, onWillUnmount } from "@odoo/owl";
+import { useState } from "@odoo/owl";
 import { _t } from "@web/core/l10n/translation";
 import { KitchenReadyPopup } from "@restaurant_kitchen_management/js/kitchen_ready_popup";
 
@@ -25,26 +25,12 @@ patch(ControlButtons.prototype, {
         // Estado reactivo del servicio cocina para mostrar el badge
         this.kitchenState = useState(this.kitchen.state);
 
-        // Arrancar polling una sola vez (el servicio es idempotente).
-        this.kitchen.startPolling(12000);
-
-        // Suscribirse a "nuevas ordenes listas" para mostrar notificacion.
-        const unsubReady = this.kitchen.onReady((newlyReady) => {
-            for (const order of newlyReady) {
-                const tableLabel = order.table_name
-                    ? _t(" para mesa %s").replace("%s", order.table_name)
-                    : "";
-                this.notification.add(
-                    _t("Cocina lista: ") + order.name + tableLabel,
-                    { type: "success", sticky: false }
-                );
-            }
-        });
-        // Liberar el listener al desmontar para evitar fugas si el componente
-        // se monta/desmonta varias veces durante la sesion.
-        onWillUnmount(() => {
-            try { unsubReady(); } catch (e) { /* noop */ }
-        });
+        // El refresco y las notificaciones de "cocina lista" los gestiona el
+        // servicio kitchen (ver kitchen_service.js), de forma independiente de
+        // la pantalla en la que este el cajero. El servicio ya arranca su propio
+        // polling de respaldo; esta llamada es idempotente y solo refuerza que
+        // este activo mientras se usa la pantalla de producto.
+        this.kitchen.startPolling(30000);
     },
 
     /**

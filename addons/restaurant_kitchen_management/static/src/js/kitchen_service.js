@@ -2,6 +2,10 @@
 
 import { registry } from "@web/core/registry";
 import { reactive } from "@odoo/owl";
+import { _t } from "@web/core/l10n/translation";
+
+const KITCHEN_BUS_CHANNEL = "restaurant_kitchen_management.kitchen";
+const KITCHEN_BUS_NOTIFICATION = "restaurant_kitchen_management.kitchen_changed";
 
 /**
  * Servicio de cocina para el POS.
@@ -20,9 +24,9 @@ import { reactive } from "@odoo/owl";
  * para actualizarse cuando llegue una orden lista.
  */
 export const kitchenService = {
-    dependencies: ["orm", "pos"],
+    dependencies: ["orm", "pos", "bus_service", "notification"],
 
-    start(env, { orm, pos }) {
+    start(env, { orm, pos, bus_service, notification }) {
         const state = reactive({
             orders: [],
             readyOrders: [],
@@ -33,6 +37,7 @@ export const kitchenService = {
 
         let pollTimer = null;
         let lastReadyIds = new Set();
+        let firstIndex = true;
         const readyListeners = new Set();
 
         function _indexOrders(orders) {
@@ -64,7 +69,20 @@ export const kitchenService = {
             const currentReadyIds = new Set(state.readyOrders.map((o) => o.id));
             const newlyReady = state.readyOrders.filter((o) => !lastReadyIds.has(o.id));
             lastReadyIds = currentReadyIds;
-            if (newlyReady.length > 0) {
+            if (firstIndex) {
+                // Primer refresco al abrir el POS: solo sembramos el estado,
+                // sin avisar de ordenes que ya estaban listas de antes.
+                firstIndex = false;
+            } else if (newlyReady.length > 0) {
+                // Notificacion centralizada en el servicio: aparece sin importar
+                // en que pantalla del POS este el cajero.
+                for (const order of newlyReady) {
+                    const tableLabel = order.table_name ? ` · ${order.table_name}` : "";
+                    notification.add(
+                        _t("Cocina lista para servir: ") + order.name + tableLabel,
+                        { type: "success", sticky: false },
+                    );
+                }
                 for (const listener of readyListeners) {
                     try {
                         listener(newlyReady);
@@ -115,6 +133,27 @@ export const kitchenService = {
             readyListeners.add(callback);
             return () => readyListeners.delete(callback);
         }
+
+        // Suscripcion al bus: cuando el backend (o el POS) emite un cambio en
+        // una orden de cocina, refrescamos al instante en vez de esperar el
+        // polling. El polling queda como red de seguridad por si se pierde la
+        // conexion del bus.
+        function _setupBusSubscription() {
+            try {
+                bus_service.addChannel(KITCHEN_BUS_CHANNEL);
+                bus_service.subscribe(KITCHEN_BUS_NOTIFICATION, () => {
+                    refreshNow();
+                });
+            } catch (e) {
+                console.warn("[kitchen] bus subscription failed:", e);
+            }
+        }
+        _setupBusSubscription();
+
+        // Arrancar el polling de respaldo desde el propio servicio, para que el
+        // refresco ocurra aunque el cajero nunca abra la pantalla de producto.
+        // El bus sigue siendo el camino principal en tiempo real.
+        startPolling(30000);
 
         return {
             state,

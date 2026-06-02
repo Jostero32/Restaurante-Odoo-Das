@@ -2,6 +2,10 @@ from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
+KITCHEN_BUS_CHANNEL = "restaurant_kitchen_management.kitchen"
+KITCHEN_BUS_NOTIFICATION = "restaurant_kitchen_management.kitchen_changed"
+
+
 class RestaurantKitchenOrder(models.Model):
     _name = "restaurant.kitchen.order"
     _description = "Orden de Cocina"
@@ -114,7 +118,37 @@ class RestaurantKitchenOrder(models.Model):
                 )
             if not vals.get("sent_at"):
                 vals["sent_at"] = fields.Datetime.now()
-        return super().create(vals_list)
+        orders = super().create(vals_list)
+        orders._notify_kitchen_change()
+        return orders
+
+    # ------------------------------------------------------------------
+    # Tiempo real (bus)
+    # ------------------------------------------------------------------
+    def _notify_kitchen_change(self):
+        """Emite una senal por el bus para que el Kanban del backend y el POS
+        se refresquen en tiempo real.
+
+        La notificacion solo indica "algo cambio"; cada cliente vuelve a
+        consultar la verdad al servidor (patron usado tambien en reservas).
+        """
+        if not self:
+            return
+        changes = [
+            {
+                "kitchen_order_id": order.id,
+                "origin_type": order.origin_type,
+                "table_id": order.table_id.id if order.table_id else False,
+                "pos_session_id": order.pos_session_id.id if order.pos_session_id else False,
+                "state": order.state,
+            }
+            for order in self
+        ]
+        self.env["bus.bus"]._sendone(
+            KITCHEN_BUS_CHANNEL,
+            KITCHEN_BUS_NOTIFICATION,
+            {"changes": changes},
+        )
 
     # ------------------------------------------------------------------
     # State actions
@@ -124,6 +158,7 @@ class RestaurantKitchenOrder(models.Model):
             "state": "preparing",
             "started_at": fields.Datetime.now(),
         })
+        self._notify_kitchen_change()
 
     def action_ready(self):
         self.write({
@@ -181,6 +216,7 @@ class RestaurantKitchenOrder(models.Model):
                     message_type="comment",
                     subtype_xmlid="mail.mt_note",
                 )
+        self._notify_kitchen_change()
 
     def action_served(self):
         """Para POS = servida al cliente.
@@ -190,6 +226,7 @@ class RestaurantKitchenOrder(models.Model):
             "state": "served",
             "served_at": fields.Datetime.now(),
         })
+        self._notify_kitchen_change()
 
     def action_cancel(self):
         # Avisar al delivery si la orden cancelada provenia de uno: el
@@ -209,6 +246,7 @@ class RestaurantKitchenOrder(models.Model):
                 if delivery.kitchen_ready:
                     delivery.sudo().write({"kitchen_ready": False})
         self.write({"state": "cancelled"})
+        self._notify_kitchen_change()
 
     # ------------------------------------------------------------------
     # API para el POS (RPC desde JavaScript / OWL)
@@ -268,6 +306,7 @@ class RestaurantKitchenOrder(models.Model):
                 message_type="comment",
                 subtype_xmlid="mail.mt_note",
             )
+            target._notify_kitchen_change()
             return {
                 "kitchen_order_id": target.id,
                 "name": target.name,
@@ -309,7 +348,8 @@ class RestaurantKitchenOrder(models.Model):
             "name": o.name,
             "state": o.state,
             "table_id": o.table_id.id if o.table_id else False,
-            "table_name": o.table_id.name if o.table_id else "",
+            # En Odoo 18 restaurant.table usa table_number (no existe el campo name).
+            "table_name": str(o.table_id.table_number) if o.table_id and o.table_id.table_number else "",
             "pos_order_id": o.pos_order_id.id if o.pos_order_id else False,
             "sent_at": fields.Datetime.to_string(o.sent_at) if o.sent_at else False,
             "ready_at": fields.Datetime.to_string(o.ready_at) if o.ready_at else False,
