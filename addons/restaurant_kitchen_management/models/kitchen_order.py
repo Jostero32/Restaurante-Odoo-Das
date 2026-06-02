@@ -224,6 +224,11 @@ class RestaurantKitchenOrder(models.Model):
             usado cuando la pos.order aun no se ha persistido en el backend.
         :return: dict con kitchen_order_id, name, line_count o warning.
         """
+        # sudo(): endpoint controlado del POS. Permite que cualquier rol de
+        # cajero (no solo mesero) envie a cocina sin AccessError. sudo NO
+        # cambia env.user, asi que waiter_user_id y create_uid siguen siendo
+        # el usuario real -> auditoria intacta.
+        self = self.sudo()
         context_data = context_data or {}
         if not lines_data:
             return {"warning": _("No hay productos para enviar a cocina.")}
@@ -299,6 +304,9 @@ class RestaurantKitchenOrder(models.Model):
         :param states: lista de estados a incluir; default ['new','preparing','ready']
         :return: lista de dicts con resumen de cada orden.
         """
+        # sudo(): endpoint de solo lectura del POS, accesible por cualquier
+        # rol de cajero sin depender de la ACL del grupo.
+        self = self.sudo()
         states = states or ["new", "preparing", "ready"]
         domain = [("origin_type", "=", "pos"), ("state", "in", states)]
         if session_id:
@@ -331,6 +339,10 @@ class RestaurantKitchenOrder(models.Model):
         de delivery NO se sirven (se despachan al repartidor), por lo que
         deben cerrarse desde el backend con el boton "Marcar Despachada".
         """
+        # sudo() primero: el guard de abajo LEE origin_type, lo que dispararia
+        # el chequeo de acceso antes de tiempo para un cajero sin ACL. La
+        # regla de negocio (no servir delivery) se mantiene intacta.
+        self = self.sudo()
         invalid = self.filtered(lambda o: o.origin_type == "delivery")
         if invalid:
             raise UserError(_(

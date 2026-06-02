@@ -1,4 +1,4 @@
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 
 
 class RestaurantDeliveryOrder(models.Model):
@@ -26,10 +26,12 @@ class RestaurantDeliveryOrder(models.Model):
         """Construye los valores para crear la orden de cocina desde un delivery."""
         self.ensure_one()
         lines_vals = []
-        # Sin sudo(): si el usuario puede confirmar el delivery, ya tiene
-        # permisos para leer las lineas del sale.order asociado. Mantener
-        # la trazabilidad de permisos es mas auditable.
-        sale_lines = self.sale_order_id.order_line.filtered(
+        # Con sudo(): este metodo se dispara tanto desde action_confirm()
+        # (usuario interno) como desde create() en pedidos web, donde el
+        # contexto puede ser el usuario publico/portal del checkout, sin
+        # permiso de lectura sobre sale.order.line ni product.template.
+        # Coherente con _compute_product_summary del modelo delivery.
+        sale_lines = self.sale_order_id.sudo().order_line.filtered(
             lambda l: not l.display_type
             and l.product_id
             and l.product_id.product_tmpl_id.kitchen_preparable
@@ -70,6 +72,31 @@ class RestaurantDeliveryOrder(models.Model):
                 message_type="comment",
                 subtype_xmlid="mail.mt_note",
             )
+
+    # ------------------------------------------------------------------
+    # CRUD
+    # ------------------------------------------------------------------
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        # La sincronizacion masiva de ventas historicas
+        # (_sync_delivery_orders_for_existing_sales, ejecutada en cada
+        # actualizacion del modulo) crea pedidos delivery 'confirmed' para
+        # TODAS las ventas existentes, incluidas las ya completadas. Ese
+        # flujo marca skip_delivery_internal_notify=True; lo respetamos para
+        # NO inundar el tablero de cocina con pedidos viejos. Un checkout web
+        # real NO lleva ese flag, asi que su orden de cocina si se crea.
+        if self.env.context.get("skip_delivery_internal_notify"):
+            return records
+        # Pedidos web: el delivery se crea directamente con state='confirmed'
+        # sin pasar por action_confirm(), por lo que hay que disparar
+        # _ensure_kitchen_order() aqui si ya viene confirmado.
+        auto_kitchen = records.filtered(
+            lambda o: o.state in ("confirmed", "assigned", "on_route") and not o.kitchen_order_id
+        )
+        if auto_kitchen:
+            auto_kitchen._ensure_kitchen_order()
+        return records
 
     # ------------------------------------------------------------------
     # State overrides

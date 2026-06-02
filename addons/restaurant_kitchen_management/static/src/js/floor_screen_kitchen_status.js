@@ -4,22 +4,33 @@ import { patch } from "@web/core/utils/patch";
 import { useService } from "@web/core/utils/hooks";
 import { useState } from "@odoo/owl";
 import { FloorScreen } from "@pos_restaurant/app/floor_screen/floor_screen";
+import { Table } from "@pos_restaurant/app/floor_screen/table";
 
 /**
- * Patch al FloorScreen: agrega utilidades reactivas para que la UI
- * muestre si una mesa tiene ordenes nuevas / en preparacion / listas.
- *
- * El template t-inherit en kitchen_floor_badges.xml usa estas helpers
- * para pintar un indicador visual sobre cada mesa.
+ * Patch al FloorScreen: solo arranca el polling del servicio kitchen
+ * para que este activo aunque el usuario entre directo al FloorScreen
+ * sin pasar por ProductScreen.
  */
 patch(FloorScreen.prototype, {
     setup() {
         super.setup(...arguments);
         this.kitchen = useService("kitchen");
-        this.kitchenState = useState(this.kitchen.state);
-        // Aseguramos que el polling este activo aunque el usuario haya
-        // entrado directo al FloorScreen sin pasar por ProductScreen.
         this.kitchen.startPolling(12000);
+    },
+});
+
+/**
+ * Patch al componente Table: inyecta el servicio kitchen y expone los
+ * helpers que usa kitchen_floor_badges.xml para pintar el badge de estado.
+ *
+ * El template hereda pos_restaurant.Table, por lo que su contexto "this"
+ * es la instancia de Table, NO de FloorScreen. Los metodos deben vivir aqui.
+ */
+patch(Table.prototype, {
+    setup() {
+        super.setup(...arguments);
+        this.kitchen = useService("kitchen");
+        this.kitchenState = useState(this.kitchen.state);
     },
 
     /**
@@ -34,15 +45,6 @@ patch(FloorScreen.prototype, {
         if (orders.some((o) => o.state === "preparing")) return "preparing";
         if (orders.some((o) => o.state === "new")) return "new";
         return null;
-    },
-
-    kitchenStatusClassForTable(table) {
-        const status = this.kitchenStatusForTable(table);
-        return {
-            ready: "kitchen-table-status ready",
-            preparing: "kitchen-table-status preparing",
-            new: "kitchen-table-status new",
-        }[status] || "";
     },
 
     kitchenStatusLabelForTable(table) {

@@ -74,6 +74,19 @@ patch(ControlButtons.prototype, {
         });
     },
 
+    /**
+     * Cuenta las lineas del pedido que tienen un producto real (excluye
+     * lineas de nota / display). Sirve para detectar envios parciales:
+     * cuantos productos del pedido NO son de cocina.
+     */
+    _countProductLines(order) {
+        const lines = order.get_orderlines ? order.get_orderlines() : (order.lines || []);
+        return lines.filter((l) => {
+            const product = l.get_product ? l.get_product() : l.product_id;
+            return Boolean(product);
+        }).length;
+    },
+
     async onClickSendToKitchen() {
         const order = this.pos.get_order();
         if (!order) {
@@ -82,6 +95,9 @@ patch(ControlButtons.prototype, {
         }
 
         const linesData = this._buildKitchenLinesData(order);
+        const totalProductLines = this._countProductLines(order);
+        const nonPreparableCount = Math.max(0, totalProductLines - linesData.length);
+
         if (linesData.length === 0) {
             this.notification.add(
                 _t("Ningun producto del pedido esta marcado como preparable en cocina."),
@@ -108,10 +124,17 @@ patch(ControlButtons.prototype, {
             const msg = result.appended
                 ? _t("Se agregaron %(n)s productos a la orden de cocina %(name)s.")
                 : _t("Orden de cocina %(name)s creada con %(n)s productos.");
-            this.notification.add(
-                msg.replace("%(name)s", result.name).replace("%(n)s", result.line_count),
-                { type: "success" }
-            );
+            let message = msg
+                .replace("%(name)s", result.name)
+                .replace("%(n)s", result.line_count);
+            // Aviso de envio parcial: el resto del pedido no es de cocina.
+            if (nonPreparableCount > 0) {
+                message += " " + _t("(%(x)s producto(s) no son de cocina y no se enviaron.)")
+                    .replace("%(x)s", nonPreparableCount);
+            }
+            this.notification.add(message, {
+                type: nonPreparableCount > 0 ? "info" : "success",
+            });
         } catch (error) {
             const message = (error && error.data && error.data.message)
                 || (error && error.message)
