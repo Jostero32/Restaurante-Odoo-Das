@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="action_task_dashboard_completed" model="ir.actions.act_window">
+        <field name="name">Dashboard: Tareas Finalizadas</field>
+        <field name="res_model">task.management.task</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="domain">[("state", "=", "done")]</field>
+        <field name="search_view_id" ref="task_management_dashboard.view_task_management_task_search"/>
+        <field name="context">{'search_default_done_tasks': 1, 'search_default_group_completed_month': 1}</field>
+    </record>
+
+    <record id="action_task_dashboard_by_state" model="ir.actions.act_window">
+        <field name="name">Dashboard: Tareas por Estado</field>
+        <field name="res_model">task.management.task</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="search_view_id" ref="task_management_dashboard.view_task_management_task_search"/>
+        <field name="context">{'search_default_group_state': 1}</field>
+    </record>
+
+    <record id="action_task_dashboard_done_by_responsible" model="ir.actions.act_window">
+        <field name="name">Dashboard: Finalizadas por Responsable</field>
+        <field name="res_model">task.management.task</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="domain">[("state", "=", "done")]</field>
+        <field name="search_view_id" ref="task_management_dashboard.view_task_management_task_search"/>
+        <field name="context">{'search_default_done_tasks': 1, 'search_default_group_responsible': 1}</field>
+    </record>
+
+    <record id="action_task_dashboard_done_by_priority" model="ir.actions.act_window">
+        <field name="name">Dashboard: Finalizadas por Prioridad</field>
+        <field name="res_model">task.management.task</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="domain">[("state", "=", "done")]</field>
+        <field name="search_view_id" ref="task_management_dashboard.view_task_management_task_search"/>
+        <field name="context">{'search_default_done_tasks': 1, 'search_default_group_priority': 1}</field>
+    </record>
+
+    <record id="action_task_dashboard_upcoming_deadline" model="ir.actions.act_window">
+        <field name="name">Dashboard: Proximas a Vencer</field>
+        <field name="res_model">task.management.task</field>
+        <field name="view_mode">list,kanban,calendar,pivot,graph,form</field>
+        <field name="domain">[("state", "not in", ("done", "cancelled"))]</field>
+        <field name="search_view_id" ref="task_management_dashboard.view_task_management_task_search"/>
+        <field name="context">{'search_default_due_next_7': 1, 'search_default_open_tasks': 1, 'search_default_group_responsible': 1}</field>
+    </record>
+
+    <record id="action_task_dashboard_overdue_by_responsible" model="ir.actions.act_window">
+        <field name="name">Dashboard: Atrasadas por Responsable</field>
+        <field name="res_model">task.management.task</field>
+        <field name="view_mode">graph,pivot,list</field>
+        <field name="domain">[("state", "not in", ("done", "cancelled")), ("date_deadline", "&lt;", context_today())]</field>
+        <field name="search_view_id" ref="task_management_dashboard.view_task_management_task_search"/>
+        <field name="context">{'search_default_overdue_tasks': 1, 'search_default_group_responsible': 1}</field>
+    </record>
+</odoo>

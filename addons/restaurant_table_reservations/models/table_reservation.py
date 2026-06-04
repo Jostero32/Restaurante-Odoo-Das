@@ -631,18 +631,29 @@ class RestaurantTableReservation(models.Model):
                 )
                 if already:
                     continue
-                pos_line_vals = {
+                product = line.product_id
+                tax_ids = product.taxes_id.filtered_domain(
+                    self.env["account.tax"]._check_company_domain(order.company_id)
+                )
+                if order.fiscal_position_id:
+                    tax_ids = order.fiscal_position_id.map_tax(tax_ids)
+                price = line.price_unit * (1 - 0.0 / 100.0)
+                tax_result = tax_ids.compute_all(
+                    price, order.currency_id, line.qty,
+                    product=product, partner=order.partner_id,
+                )
+                preface = _("Pre-orden reserva %s.") % reservation.name
+                PosOrderLine.create({
                     "order_id": order.id,
-                    "product_id": line.product_id.id,
+                    "product_id": product.id,
                     "qty": line.qty,
                     "price_unit": line.price_unit,
+                    "tax_ids": [(6, 0, tax_ids.ids)],
+                    "price_subtotal": tax_result["total_excluded"],
+                    "price_subtotal_incl": tax_result["total_included"],
                     "reservation_id": reservation.id,
-                }
-                preface = _("Pre-orden reserva %s.") % reservation.name
-                pos_line_vals["note"] = (
-                    f"{preface} {line.notes}" if line.notes else preface
-                )
-                PosOrderLine.create(pos_line_vals)
+                    "note": f"{preface} {line.notes}" if line.notes else preface,
+                })
             reservation.sudo().write({"pre_order_lines_charged": True})
 
     def _notify_pos_reservation_change(self, table_ids=None):

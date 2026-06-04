@@ -191,6 +191,14 @@ class PaymentKushki(http.Controller):
             # Handle the notification data
             tx_sudo._process_notification_data(response_text)
 
+            # Confirm sale order immediately to create the delivery order.
+            # Full accounting post-processing (payment recording) is handled
+            # asynchronously by Odoo's _cron_post_process scheduled action.
+            if tx_sudo.state == 'done':
+                tx_sudo.sale_order_ids.filtered(
+                    lambda so: so.state in ('draft', 'sent')
+                ).with_context(send_email=True).action_confirm()
+
         else:
             # Cobro no Autorizado
             result.append({'key': 'message', 'value': response_text['message']})
