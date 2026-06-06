@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_task_management_task_user,task.management.task.user,model_task_management_task,task_management_dashboard.group_task_management_user,1,1,1,0
+access_task_management_task_manager,task.management.task.manager,model_task_management_task,task_management_dashboard.group_task_management_manager,1,1,1,1
+access_task_management_assignee_user,task.management.assignee.user,model_task_management_assignee,task_management_dashboard.group_task_management_user,1,1,1,0
+access_task_management_assignee_manager,task.management.assignee.manager,model_task_management_assignee,task_management_dashboard.group_task_management_manager,1,1,1,1

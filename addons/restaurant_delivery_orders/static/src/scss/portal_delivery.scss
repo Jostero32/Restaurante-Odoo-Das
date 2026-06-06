@@ -1,199 +1,353 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Paleta de marca — Casa Vieja
+// ─────────────────────────────────────────────────────────────────────────────
+$rcv-gold:        #B58A3D;
+$rcv-gold-dark:   #8A6520;
+$rcv-gold-light:  #F5E8C8;
+$rcv-brown:       #2C1A0E;
+$rcv-brown-mid:   #6A5240;
+$rcv-cream:       #FAF7F0;
+$rcv-sand:        #E8DCCB;
+$rcv-text:        #1A1209;
+$rcv-text-muted:  #7A6A56;
+$rcv-white:       #FFFFFF;
+$rcv-success:     #2E7D32;
+$rcv-success-bg:  #E8F5E9;
+$rcv-danger:      #C62828;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shop — tabs de categorías del menú
+// ─────────────────────────────────────────────────────────────────────────────
+#o_restaurant_category_tabs {
+    .o_rcv_tab {
+        display: inline-block;
+        padding: 0.35rem 1rem;
+        border-radius: 999px;
+        border: 1.5px solid $rcv-gold;
+        color: $rcv-gold-dark;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-decoration: none;
+        background: $rcv-white;
+        transition: background 0.15s ease, color 0.15s ease;
+
+        &:hover {
+            background: $rcv-gold-light;
+            color: $rcv-gold-dark;
+            text-decoration: none;
+        }
+
+        &.o_rcv_tab--active {
+            background: $rcv-gold;
+            color: $rcv-white;
+            border-color: $rcv-gold;
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tarjetas de pedido delivery (lista)
+// ─────────────────────────────────────────────────────────────────────────────
 .rcv-delivery-card {
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
-    border-radius: 14px;
+    border-radius: 16px;
+    border-left: 3px solid transparent;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
 .rcv-delivery-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 0.75rem 1.5rem rgba(17, 24, 39, 0.15) !important;
+    transform: translateY(-3px);
+    box-shadow: 0 1rem 2.5rem rgba(44, 26, 14, 0.14) !important;
+    border-left-color: $rcv-gold;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Métricas — fila de KPIs en la cabecera del listado
+// ─────────────────────────────────────────────────────────────────────────────
 .rcv-portal-metrics .rcv-metric-card {
-    border: 1px solid #e5e7eb;
-    border-radius: 12px;
-    background: #ffffff;
-    padding: 0.75rem 0.8rem;
-    min-height: 104px;
+    border: 1px solid $rcv-sand;
+    border-radius: 14px;
+    background: $rcv-white;
+    padding: 0.85rem 1rem;
+    min-height: 108px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    transition: box-shadow 0.15s ease;
+
+    &:hover {
+        box-shadow: 0 0.5rem 1.2rem rgba(44, 26, 14, 0.08);
+    }
 }
 
 .rcv-metric-label {
-    font-size: 0.72rem;
-    letter-spacing: 0.03em;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: #6b7280;
-    font-weight: 600;
+    color: $rcv-text-muted;
+    font-weight: 700;
 }
 
 .rcv-metric-value {
-    font-size: 1.45rem;
-    color: #111827;
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: $rcv-brown;
     line-height: 1.1;
 }
 
 .rcv-metric-help {
-    color: #6b7280;
-    font-size: 0.8rem;
+    color: $rcv-text-muted;
+    font-size: 0.78rem;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Pills de ETA y total dentro de la tarjeta
+// ─────────────────────────────────────────────────────────────────────────────
 .rcv-pill {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
     border-radius: 999px;
-    padding: 0.4rem 0.7rem;
-    font-size: 0.85rem;
-    font-weight: 500;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.83rem;
+    font-weight: 600;
     width: 100%;
 }
 
 .rcv-pill-eta {
-    background: #e8f0fe;
-    color: #1d4ed8;
+    background: $rcv-gold-light;
+    color: $rcv-gold-dark;
 }
 
 .rcv-pill-total {
-    background: #ecfdf5;
-    color: #047857;
+    background: $rcv-success-bg;
+    color: $rcv-success;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque de dirección
+// ─────────────────────────────────────────────────────────────────────────────
 .rcv-address {
-    padding: 0.7rem;
-    border: 1px solid #e5e7eb;
+    padding: 0.7rem 0.9rem;
+    border: 1px solid $rcv-sand;
     border-radius: 10px;
-    background: #f9fafb;
+    background: $rcv-cream;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Tarjeta de factura (lista)
+// ─────────────────────────────────────────────────────────────────────────────
 .rcv-invoice-card {
-    border-radius: 14px;
-}
-
-.rcv-invoice-card .btn {
-    min-width: 112px;
-}
-
-.rcv-delivery-detail .rcv-detail-hero {
     border-radius: 16px;
+
+    .btn {
+        min-width: 112px;
+    }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Detalle del pedido / factura
+// ─────────────────────────────────────────────────────────────────────────────
+.rcv-delivery-detail .rcv-detail-hero {
+    border-radius: 18px;
+    border-left: 5px solid $rcv-gold;
+}
+
+// KPI cards dentro del detalle
 .rcv-kpi {
     border-radius: 12px;
-    background: #111827;
-    color: #ffffff;
-    padding: 0.75rem 0.8rem;
+    background: $rcv-brown;
+    color: $rcv-white;
+    padding: 0.85rem 1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: 0.25rem;
+
+    small {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        opacity: 0.75;
+    }
+
+    strong {
+        font-size: 1.05rem;
+        font-weight: 700;
+    }
 }
 
-.rcv-kpi small {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    opacity: 0.78;
-}
-
-.rcv-kpi strong {
-    font-size: 1rem;
-}
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Barra de progreso del pedido
+// ─────────────────────────────────────────────────────────────────────────────
 .rcv-progress {
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
+    gap: 0;
+    position: relative;
+
+    // Línea vertical conectora
+    &::before {
+        content: '';
+        position: absolute;
+        left: 5px;
+        top: 6px;
+        bottom: 6px;
+        width: 2px;
+        background: $rcv-sand;
+    }
 }
 
 .rcv-progress-item {
     display: flex;
     align-items: center;
-    gap: 0.7rem;
-    color: #6b7280;
+    gap: 0.9rem;
+    color: $rcv-text-muted;
+    padding: 0.6rem 0;
+    position: relative;
 }
 
 .rcv-progress-dot {
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    border: 2px solid #d1d5db;
-    background: #ffffff;
+    border: 2px solid $rcv-sand;
+    background: $rcv-white;
     flex: 0 0 auto;
+    position: relative;
+    z-index: 1;
+    transition: border-color 0.2s, background 0.2s, transform 0.2s;
 }
 
 .rcv-progress-item.is-done .rcv-progress-dot {
-    border-color: #16a34a;
-    background: #16a34a;
+    border-color: $rcv-success;
+    background: $rcv-success;
 }
 
 .rcv-progress-item.is-current .rcv-progress-dot {
-    border-color: #2563eb;
-    background: #2563eb;
+    border-color: $rcv-gold;
+    background: $rcv-gold;
+    transform: scale(1.3);
+    box-shadow: 0 0 0 4px rgba($rcv-gold, 0.2);
 }
 
-.rcv-progress-item.is-done .rcv-progress-label,
+.rcv-progress-item.is-done .rcv-progress-label {
+    color: $rcv-brown-mid;
+    font-weight: 500;
+}
+
 .rcv-progress-item.is-current .rcv-progress-label {
-    color: #111827;
-    font-weight: 600;
+    color: $rcv-brown;
+    font-weight: 700;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque de info genérico
+// ─────────────────────────────────────────────────────────────────────────────
 .rcv-info-block {
-    padding: 0.7rem;
+    padding: 0.75rem 0.9rem;
     border-radius: 10px;
-    border: 1px solid #e5e7eb;
-    background: #ffffff;
+    border: 1px solid $rcv-sand;
+    background: $rcv-white;
+    height: 100%;
+
+    small {
+        display: block;
+        color: $rcv-text-muted;
+        margin-bottom: 0.2rem;
+        text-transform: uppercase;
+        font-size: 0.68rem;
+        letter-spacing: 0.05em;
+        font-weight: 700;
+    }
 }
 
-.rcv-info-block small {
-    display: block;
-    color: #6b7280;
-    margin-bottom: 0.2rem;
-    text-transform: uppercase;
-    font-size: 0.72rem;
-}
-
+// ─────────────────────────────────────────────────────────────────────────────
+// Incidencias
+// ─────────────────────────────────────────────────────────────────────────────
 .rcv-incident-item {
-    border: 1px solid #e5e7eb;
+    border: 1px solid $rcv-sand;
     border-radius: 10px;
-    padding: 0.65rem;
-    background: #ffffff;
+    padding: 0.7rem 0.8rem;
+    background: $rcv-white;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Desglose de factura
+// ─────────────────────────────────────────────────────────────────────────────
 .rcv-invoice-breakdown {
-    border: 1px solid #e5e7eb;
+    border: 1px solid $rcv-sand;
     border-radius: 12px;
     overflow: hidden;
 }
 
 .rcv-breakdown-row {
-    padding: 0.7rem 0.9rem;
+    padding: 0.75rem 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 0.6rem;
-    border-bottom: 1px solid #e5e7eb;
-}
+    border-bottom: 1px solid $rcv-sand;
 
-.rcv-breakdown-row:last-child {
-    border-bottom: 0;
+    &:last-child {
+        border-bottom: none;
+    }
 }
 
 .rcv-breakdown-total {
-    background: #111827;
-    color: #ffffff;
+    background: $rcv-brown;
+    color: $rcv-white;
+    font-weight: 700;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Pedidos relacionados (enlace en factura)
+// ─────────────────────────────────────────────────────────────────────────────
 .rcv-related-order {
-    border: 1px solid #e5e7eb;
+    border: 1px solid $rcv-sand;
     border-radius: 10px;
-    padding: 0.65rem 0.75rem;
-    background: #ffffff;
+    padding: 0.65rem 0.8rem;
+    background: $rcv-white;
+    transition: border-color 0.15s, background 0.15s;
+
+    &:hover {
+        border-color: $rcv-gold;
+        background: $rcv-cream;
+    }
 }
 
-.rcv-related-order:hover {
-    border-color: #d1d5db;
-    background: #f9fafb;
+// ─────────────────────────────────────────────────────────────────────────────
+// Calificación con estrellas
+// ─────────────────────────────────────────────────────────────────────────────
+.rcv-stars {
+    direction: ltr;
+    user-select: none;
+
+    .rcv-star-label {
+        cursor: pointer;
+        color: $rcv-sand;
+        font-size: 1.8rem;
+        transition: color 0.12s ease, transform 0.12s ease;
+
+        &:hover {
+            transform: scale(1.12);
+        }
+    }
+
+    .rcv-star-input:checked ~ .rcv-star-label,
+    .rcv-star-label:hover,
+    .rcv-star-label:hover ~ .rcv-star-label {
+        color: $rcv-gold;
+    }
+
+    .rcv-star-input:focus-visible ~ .rcv-star-label {
+        outline: 2px solid $rcv-gold;
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Responsive
+// ─────────────────────────────────────────────────────────────────────────────
 @media (max-width: 991px) {
     .rcv-kpi {
         min-height: auto;
@@ -202,27 +356,8 @@
     .rcv-invoice-card .btn {
         min-width: auto;
     }
-}
 
-.rcv-stars {
-    direction: ltr;
-    user-select: none;
-}
-.rcv-stars .rcv-star-label {
-    cursor: pointer;
-    color: #cbd5e1 !important;
-    transition: color 0.12s ease, transform 0.12s ease;
-}
-.rcv-stars .rcv-star-label:hover {
-    transform: scale(1.08);
-}
-.rcv-stars .rcv-star-input:checked ~ .rcv-star-label,
-.rcv-stars .rcv-star-label:hover,
-.rcv-stars .rcv-star-label:hover ~ .rcv-star-label {
-    color: #f59e0b !important;
-}
-.rcv-stars .rcv-star-input:focus-visible ~ .rcv-star-label {
-    outline: 2px solid #4338ca;
-    outline-offset: 2px;
-    border-radius: 4px;
+    .rcv-progress::before {
+        display: none;
+    }
 }

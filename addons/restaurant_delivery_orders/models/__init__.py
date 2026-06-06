@@ -2,8 +2,10 @@ from . import delivery_order
 from . import delivery_incident
 from . import delivery_rating
 from . import delivery_schedule
+from . import payment_transaction
 from . import product_template
 from . import res_company
+from . import res_config_settings
 from . import res_users
 from . import sale_order
 from . import sale_order_line

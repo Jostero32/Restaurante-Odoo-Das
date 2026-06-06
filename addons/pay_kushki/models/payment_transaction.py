@@ -129,7 +129,7 @@ class PaymentTransaction(models.Model):
                 )
             )
         self.provider_reference = txn_id
-        self.paypal_type = txn_type
+        self.kushki_type = txn_type
         self.provider_reference = notification_data['transactionReference']
 
         payment_status = notification_data['details']['transactionStatus']

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem
+        id="menu_task_management_root"
+        name="Gestion de Tareas"
+        sequence="65"
+        groups="task_management_dashboard.group_task_management_user,task_management_dashboard.group_task_management_manager"/>
+
+    <menuitem
+        id="menu_task_management_tasks"
+        name="Tareas"
+        parent="menu_task_management_root"
+        action="task_management_dashboard.action_task_management_task"
+        sequence="10"
+        groups="task_management_dashboard.group_task_management_user,task_management_dashboard.group_task_management_manager"/>
+
+    <menuitem
+        id="menu_task_management_assignees"
+        name="Asignados"
+        parent="menu_task_management_root"
+        action="task_management_dashboard.action_task_management_assignee"
+        sequence="20"
+        groups="task_management_dashboard.group_task_management_user,task_management_dashboard.group_task_management_manager"/>
+
+    <menuitem
+        id="menu_task_management_dashboard_root"
+        name="Dashboard"
+        parent="menu_task_management_root"
+        sequence="30"
+        groups="task_management_dashboard.group_task_management_user,task_management_dashboard.group_task_management_manager"/>
+
+    <menuitem
+        id="menu_task_dashboard_completed"
+        name="Finalizadas por Mes"
+        parent="menu_task_management_dashboard_root"
+        action="task_management_dashboard.action_task_dashboard_completed"
+        sequence="10"
+        groups="task_management_dashboard.group_task_management_user,task_management_dashboard.group_task_management_manager"/>
+
+    <menuitem
+        id="menu_task_dashboard_by_state"
+        name="Por Estado"
+        parent="menu_task_management_dashboard_root"
+        action="task_management_dashboard.action_task_dashboard_by_state"
+        sequence="20"
+        groups="task_management_dashboard.group_task_management_user,task_management_dashboard.group_task_management_manager"/>
+
+    <menuitem
+        id="menu_task_dashboard_done_by_responsible"
+        name="Finalizadas por Responsable"
+        parent="menu_task_management_dashboard_root"
+        action="task_management_dashboard.action_task_dashboard_done_by_responsible"
+        sequence="30"
+        groups="task_management_dashboard.group_task_management_user,task_management_dashboard.group_task_management_manager"/>
+
+    <menuitem
+        id="menu_task_dashboard_done_by_priority"
+        name="Finalizadas por Prioridad"
+        parent="menu_task_management_dashboard_root"
+        action="task_management_dashboard.action_task_dashboard_done_by_priority"
+        sequence="40"
+        groups="task_management_dashboard.group_task_management_user,task_management_dashboard.group_task_management_manager"/>
+
+    <menuitem
+        id="menu_task_dashboard_upcoming_deadline"
+        name="Proximas a Vencer"
+        parent="menu_task_management_dashboard_root"
+        action="task_management_dashboard.action_task_dashboard_upcoming_deadline"
+        sequence="50"
+        groups="task_management_dashboard.group_task_management_user,task_management_dashboard.group_task_management_manager"/>
+
+    <menuitem
+        id="menu_task_dashboard_overdue_by_responsible"
+        name="Atrasadas por Responsable"
+        parent="menu_task_management_dashboard_root"
+        action="task_management_dashboard.action_task_dashboard_overdue_by_responsible"
+        sequence="60"
+        groups="task_management_dashboard.group_task_management_user,task_management_dashboard.group_task_management_manager"/>
+</odoo>

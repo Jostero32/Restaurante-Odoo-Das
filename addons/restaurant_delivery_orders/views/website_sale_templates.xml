@@ -130,4 +130,25 @@
             <attribute name="class" add="d-none" separator=" "/>
         </xpath>
     </template>
+
+    <!-- ── Shop: tabs de categorías del menú ─────────────────────────────── -->
+    <template id="shop_menu_category_tabs"
+              inherit_id="website_sale.products"
+              name="Shop - Tabs Categorías Menú">
+        <xpath expr="//div[@id='products_grid']/t[@t-call='website_sale.products_breadcrumb']"
+               position="after">
+            <div id="o_restaurant_category_tabs" class="d-flex flex-wrap gap-2 mb-3 mt-2">
+                <a href="/shop"
+                   t-attf-class="o_rcv_tab #{not restaurant_active_categ_id and 'o_rcv_tab--active' or ''}">
+                    Todos
+                </a>
+                <t t-foreach="restaurant_menu_categories" t-as="rcv_cat">
+                    <a t-attf-href="/shop?categ_id=#{rcv_cat[0]}"
+                       t-attf-class="o_rcv_tab #{restaurant_active_categ_id == rcv_cat[0] and 'o_rcv_tab--active' or ''}">
+                        <t t-out="rcv_cat[1]"/>
+                    </a>
+                </t>
+            </div>
+        </xpath>
+    </template>
 </odoo>

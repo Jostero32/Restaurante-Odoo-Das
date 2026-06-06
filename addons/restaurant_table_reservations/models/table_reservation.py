@@ -39,7 +39,13 @@ class RestaurantTableReservation(models.Model):
         default="main",
         tracking=True,
     )
-    table_id = fields.Many2one("restaurant.table", string="Mesa", required=True, tracking=True)
+    table_id = fields.Many2one(
+        "restaurant.table",
+        string="Mesa",
+        required=True,
+        tracking=True,
+        ondelete="restrict",
+    )
     start_datetime = fields.Datetime(string="Inicio", required=True, tracking=True)
     end_datetime = fields.Datetime(string="Fin", required=True, tracking=True)
     notes = fields.Text(string="Notas")
@@ -83,6 +89,43 @@ class RestaurantTableReservation(models.Model):
         help="Indica si el cargo por arreglo ya fue añadido a la orden POS para evitar dobles cargos.",
     )
 
+    # ------------------------------------------------------------------
+    # Pre-orden
+    # ------------------------------------------------------------------
+    currency_id = fields.Many2one(
+        "res.currency",
+        default=lambda self: self.env.company.currency_id,
+        required=True,
+    )
+    pre_order_line_ids = fields.One2many(
+        "restaurant.table.reservation.line",
+        "reservation_id",
+        string="Pre-orden",
+        copy=False,
+    )
+    pre_order_total = fields.Monetary(
+        string="Total pre-orden",
+        compute="_compute_pre_order_totals",
+        store=True,
+        currency_field="currency_id",
+    )
+    pre_order_count = fields.Integer(
+        string="Items pre-orden",
+        compute="_compute_pre_order_totals",
+        store=True,
+    )
+    pre_order_lines_charged = fields.Boolean(
+        default=False,
+        copy=False,
+        help="Las lineas de pre-orden ya fueron volcadas al POS para evitar duplicados.",
+    )
+
+    @api.depends("pre_order_line_ids.price_subtotal", "pre_order_line_ids.qty")
+    def _compute_pre_order_totals(self):
+        for reservation in self:
+            reservation.pre_order_total = sum(reservation.pre_order_line_ids.mapped("price_subtotal"))
+            reservation.pre_order_count = int(sum(reservation.pre_order_line_ids.mapped("qty")))
+
     def _get_arrangement_cost(self):
         """Return the numeric cost: prefer arrangement_product_id, fallback to legacy type."""
         if self.arrangement_product_id:
@@ -124,6 +167,48 @@ class RestaurantTableReservation(models.Model):
     @api.model
     def _get_end_datetime(self, start_datetime):
         return start_datetime + timedelta(minutes=self.RESERVATION_MINUTES + self.BUFFER_MINUTES)
+
+    @api.model
+    def _get_business_schedule(self):
+        # Reusamos el horario configurado en delivery: feriados y franjas
+        # operativas son los mismos para reservas en sitio.
+        Schedule = self.env["restaurant.delivery.schedule"].sudo()
+        return Schedule._get_or_create_for_company(self.env.company)
+
+    @api.model
+    def _get_schedule_status_for_date(self, date_value):
+        if not date_value:
+            return {"is_open": True, "message": ""}
+        selected_date = fields.Date.from_string(date_value) if isinstance(date_value, str) else date_value
+        schedule = self._get_business_schedule()
+
+        # Verificar ventana maxima de reserva
+        max_days = schedule.max_schedule_days or 0
+        if max_days > 0:
+            today = fields.Date.context_today(self)
+            if (selected_date - today).days > max_days:
+                return {
+                    "is_open": False,
+                    "message": _("Solo se pueden hacer reservas con hasta %(days)s dias de anticipacion.") % {
+                        "days": max_days
+                    },
+                }
+
+        exception = schedule._exception_for_date(selected_date)
+        if exception and exception.is_closed:
+            return {
+                "is_open": False,
+                "message": _("Cerrado el %(date)s: %(reason)s.") % {
+                    "date": selected_date.isoformat(),
+                    "reason": exception.name,
+                },
+            }
+        if not schedule._ranges_for_date(selected_date):
+            return {
+                "is_open": False,
+                "message": _("El restaurante no opera ese dia."),
+            }
+        return {"is_open": True, "message": ""}
 
     _ARRANGEMENT_CODE_MAP = {
         'birthday': 'ARR-BIRTHDAY',
@@ -172,9 +257,37 @@ class RestaurantTableReservation(models.Model):
                 'name': p.name,
                 'price': p.list_price,
                 'label': f"{p.name} +${p.list_price:.2f}",
+                'description': p.description_sale or "",
+                'image_url': f"/web/image/product.template/{p.id}/image_128",
             }
             for p in seen.values()
         ]
+
+    @api.model
+    def _get_pre_order_products(self):
+        products = self.env["product.product"].sudo().search(
+            [
+                ("active", "=", True),
+                ("sale_ok", "=", True),
+                ("product_tmpl_id.available_for_reservation_preorder", "=", True),
+            ],
+            order="name asc, id asc",
+        )
+        result = []
+        for product in products:
+            result.append(
+                {
+                    "id": product.id,
+                    "name": product.display_name,
+                    "price": product.lst_price,
+                    "currency_symbol": self.env.company.currency_id.symbol or "$",
+                    "uom_name": product.uom_id.name or "",
+                    "image_url": f"/web/image/product.product/{product.id}/image_128",
+                    "description": product.description_sale or "",
+                    "follows_party_size": bool(product.product_tmpl_id.preorder_qty_follows_party_size),
+                }
+            )
+        return result
 
     @api.model
     def _get_arrangement_label(self, arrangement_type=None, product=None):
@@ -209,29 +322,84 @@ class RestaurantTableReservation(models.Model):
         current_utc = fields.Datetime.now()
         if start_datetime < current_utc:
             raise ValidationError(_("No puedes reservar en un horario anterior al momento actual."))
+        schedule = self._get_business_schedule()
+
+        # Anticipacion minima (min_lead_time_minutes)
+        min_lead = schedule.min_lead_time_minutes or 0
+        if min_lead > 0:
+            min_allowed = current_utc + timedelta(minutes=min_lead)
+            if start_datetime < min_allowed:
+                raise ValidationError(_(
+                    "La reserva debe solicitarse con al menos %(min)s minutos de anticipacion."
+                ) % {"min": min_lead})
+
+        local_start = schedule._to_company_local(start_datetime)
+        local_date = local_start.date()
+
+        # Ventana maxima de reserva (max_schedule_days)
+        max_days = schedule.max_schedule_days or 0
+        if max_days > 0:
+            local_today = schedule._to_company_local(current_utc).date()
+            if (local_date - local_today).days > max_days:
+                raise ValidationError(_(
+                    "Solo se pueden hacer reservas con hasta %(days)s dias de anticipacion."
+                ) % {"days": max_days})
+
+        exception = schedule._exception_for_date(local_date)
+        if exception and exception.is_closed:
+            raise ValidationError(_("El restaurante esta cerrado el %(date)s: %(reason)s.") % {
+                "date": local_date.isoformat(),
+                "reason": exception.name,
+            })
+        ranges = schedule._ranges_for_date(local_date)
+        if not ranges:
+            raise ValidationError(_("El restaurante no opera ese dia."))
+        start_decimal = local_start.hour + local_start.minute / 60.0
+        end_decimal = start_decimal + self.RESERVATION_MINUTES / 60.0
+        for time_from, time_to in ranges:
+            if time_from <= start_decimal and end_decimal <= time_to:
+                return
+        raise ValidationError(_(
+            "La hora seleccionada no encaja en el horario operativo. "
+            "Recuerda que la reserva dura %(min)s minutos."
+        ) % {"min": self.RESERVATION_MINUTES})
 
     @api.model
-    def _get_time_options(self, date_value, start_hour=8, end_hour=22, step_minutes=15):
-        """Return allowed time options for a given date, clipping past times on the current day."""
+    def _get_time_options(self, date_value):
+        """Return allowed time options for a given date based on the business schedule."""
         if not date_value:
             return []
-
-        today_local = fields.Date.context_today(self)
         selected_date = fields.Date.from_string(date_value)
-        start_total_minutes = start_hour * 60
-
+        schedule = self._get_business_schedule()
+        ranges = schedule._ranges_for_date(selected_date)
+        if not ranges:
+            return []
+        step_minutes = schedule.slot_minutes or 15
+        today_local = fields.Date.context_today(self)
+        min_cutoff_decimal = None
         if selected_date == today_local:
             now_local = fields.Datetime.context_timestamp(self, fields.Datetime.now())
-            current_minutes = now_local.hour * 60 + now_local.minute
-            start_total_minutes = max(start_total_minutes, ((current_minutes + step_minutes - 1) // step_minutes) * step_minutes)
-
+            min_lead_hours = (schedule.min_lead_time_minutes or 0) / 60.0
+            min_cutoff_decimal = now_local.hour + now_local.minute / 60.0 + min_lead_hours
+        reservation_hours = self.RESERVATION_MINUTES / 60.0
         options = []
-        for total_minutes in range(start_total_minutes, (end_hour * 60) + 1, step_minutes):
-            hours = total_minutes // 60
-            minutes = total_minutes % 60
-            if hours < start_hour or hours > end_hour:
+        seen = set()
+        for time_from, time_to in ranges:
+            # Solo ofrecemos inicios cuyos 60 min de reserva caigan dentro de la franja.
+            max_start_decimal = time_to - reservation_hours
+            if max_start_decimal < time_from:
                 continue
-            options.append(f"{hours:02d}:{minutes:02d}")
+            start_minutes = int(round(time_from * 60))
+            max_minutes = int(round(max_start_decimal * 60))
+            for minutes in range(start_minutes, max_minutes + 1, step_minutes):
+                decimal = minutes / 60.0
+                if min_cutoff_decimal is not None and decimal < min_cutoff_decimal:
+                    continue
+                label = f"{minutes // 60:02d}:{minutes % 60:02d}"
+                if label in seen:
+                    continue
+                seen.add(label)
+                options.append(label)
         return options
 
     @api.model
@@ -391,6 +559,25 @@ class RestaurantTableReservation(models.Model):
             start_datetime = fields.Datetime.to_datetime(vals["start_datetime"])
             self._validate_requested_start_datetime(start_datetime)
             vals["end_datetime"] = fields.Datetime.to_string(self._get_end_datetime(start_datetime))
+
+        # Proteger pre-orden ya cobrada: impedir agregar, modificar o quitar lineas.
+        if "pre_order_line_ids" in vals:
+            for reservation in self:
+                if reservation.pre_order_lines_charged:
+                    raise ValidationError(
+                        _("No se puede modificar la pre-orden de la reserva %(name)s porque ya fue cobrada en caja.")
+                        % {"name": reservation.name}
+                    )
+
+        # Proteger arreglo ya cobrado: impedir cambiar el tipo o producto de arreglo.
+        if "arrangement_product_id" in vals or "arrangement_type" in vals:
+            for reservation in self:
+                if reservation.arrangement_charged:
+                    raise ValidationError(
+                        _("No se puede cambiar el arreglo de la reserva %(name)s porque ya fue cobrado en caja.")
+                        % {"name": reservation.name}
+                    )
+
         return super().write(vals)
 
     # ------------------------------------------------------------------
@@ -461,6 +648,7 @@ class RestaurantTableReservation(models.Model):
     def action_seated(self):
         self.write({"state": "seated"})
         self._create_pos_order_for_reservation()
+        self._inject_pre_order_lines_into_pos_order()
         self._notify_pos_reservation_change()
 
     def action_done(self):
@@ -475,6 +663,57 @@ class RestaurantTableReservation(models.Model):
         for reservation in self:
             reservation.activity_ids.filtered(lambda a: a.res_model == "restaurant.table.reservation").unlink()
         self._notify_pos_reservation_change()
+
+    # ------------------------------------------------------------------
+    # Volcado del pre-orden al POS al sentar a los clientes
+    # ------------------------------------------------------------------
+
+    def _inject_pre_order_lines_into_pos_order(self):
+        PosOrder = self.env["pos.order"].sudo()
+        PosOrderLine = self.env["pos.order.line"].sudo()
+        for reservation in self:
+            if reservation.pre_order_lines_charged or not reservation.pre_order_line_ids:
+                continue
+            order = PosOrder.search(
+                [
+                    ("table_id", "=", reservation.table_id.id),
+                    ("state", "=", "draft"),
+                ],
+                order="id desc",
+                limit=1,
+            )
+            if not order:
+                continue
+            for line in reservation.pre_order_line_ids:
+                already = order.lines.filtered(
+                    lambda ol: ol.product_id == line.product_id and ol.reservation_id == reservation
+                )
+                if already:
+                    continue
+                product = line.product_id
+                tax_ids = product.taxes_id.filtered_domain(
+                    self.env["account.tax"]._check_company_domain(order.company_id)
+                )
+                if order.fiscal_position_id:
+                    tax_ids = order.fiscal_position_id.map_tax(tax_ids)
+                price = line.price_unit * (1 - 0.0 / 100.0)
+                tax_result = tax_ids.compute_all(
+                    price, order.currency_id, line.qty,
+                    product=product, partner=order.partner_id,
+                )
+                preface = _("Pre-orden reserva %s.") % reservation.name
+                PosOrderLine.create({
+                    "order_id": order.id,
+                    "product_id": product.id,
+                    "qty": line.qty,
+                    "price_unit": line.price_unit,
+                    "tax_ids": [(6, 0, tax_ids.ids)],
+                    "price_subtotal": tax_result["total_excluded"],
+                    "price_subtotal_incl": tax_result["total_included"],
+                    "reservation_id": reservation.id,
+                    "note": f"{preface} {line.notes}" if line.notes else preface,
+                })
+            reservation.sudo().write({"pre_order_lines_charged": True})
 
     def _notify_pos_reservation_change(self, table_ids=None):
         self.env["bus.bus"]._sendone(

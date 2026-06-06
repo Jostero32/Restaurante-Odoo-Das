@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_task_management" model="ir.module.category">
+        <field name="name">Gestion de Tareas</field>
+        <field name="description">Permisos para el modulo de tareas</field>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="group_task_management_user" model="res.groups">
+        <field name="name">Usuario de Tareas</field>
+        <field name="category_id" ref="task_management_dashboard.module_category_task_management"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="group_task_management_manager" model="res.groups">
+        <field name="name">Administrador de Tareas</field>
+        <field name="category_id" ref="task_management_dashboard.module_category_task_management"/>
+        <field name="implied_ids" eval="[(4, ref('task_management_dashboard.group_task_management_user'))]"/>
+        <field name="users" eval="[(4, ref('base.user_admin'))]"/>
+    </record>
+</odoo>

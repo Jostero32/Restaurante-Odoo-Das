@@ -89,7 +89,7 @@ class SaleOrder(models.Model):
             has_real_lines = bool(order.order_line.filtered(lambda line: not line.display_type))
             if not has_real_lines:
                 continue
-            order.action_confirm()
+            order.with_context(skip_slot_validation=True).action_confirm()
 
     def action_finalize_delivery_invoicing(self):
         customer_invoice_types = {"out_invoice", "out_receipt"}
@@ -181,9 +181,19 @@ class SaleOrder(models.Model):
         }
 
     def _ensure_fixed_delivery_fee_line(self):
+        # Creación perezosa del carrier si aún no existe (p.ej. primer deploy)
+        for company in self.mapped("company_id"):
+            if company.delivery_fee_product_id and not company.restaurant_delivery_carrier_id:
+                company._sync_restaurant_delivery_carrier()
+
         SaleOrderLine = self.env["sale.order.line"]
         for order in self:
             if not order._requires_fixed_delivery_fee():
+                continue
+            # Si hay una línea de carrier de Odoo (is_delivery=True), no duplicar
+            if order.order_line.filtered(
+                lambda l: getattr(l, "is_delivery", False) and not l.is_delivery_fee
+            ):
                 continue
 
             company = order.company_id
@@ -259,6 +269,16 @@ class SaleOrder(models.Model):
             if not order._is_delivery_sync_candidate():
                 continue
             order._ensure_fixed_delivery_fee_line()
+
+            # Lock the sale order row to serialize concurrent delivery order creation.
+            # Without this, two simultaneous checkout confirmations for the same order
+            # (e.g. double-click, webhook retry) could both find no delivery order and
+            # create two separate ones.
+            self.env.cr.execute(
+                "SELECT id FROM sale_order WHERE id = %s FOR UPDATE",
+                (order.id,),
+            )
+
             delivery_order = order.delivery_order_id.sudo() or DeliveryOrder.search(
                 [("sale_order_id", "=", order.id)], limit=1
             )
@@ -290,6 +310,8 @@ class SaleOrder(models.Model):
         )._sync_delivery_order_from_sale()
 
     def _validate_scheduled_delivery_slot(self):
+        if self.env.context.get("skip_slot_validation"):
+            return
         Schedule = self.env["restaurant.delivery.schedule"].sudo()
         for order in self:
             if not order.delivery_is_scheduled:

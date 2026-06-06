@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_general_configuration_delivery" model="ir.ui.view">
+        <field name="name">res.config.settings.form.delivery</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Delivery" string="Delivery" name="restaurant_delivery_orders">
+                    <block title="Delivery (Ecommerce)" id="restaurant_delivery_settings">
+                        <setting string="Costo fijo de envio"
+                                 help="Tarifa fija que se cobra en cada pedido delivery por ecommerce. Ponga 0 para no cobrar envio.">
+                            <field name="delivery_fixed_fee" widget="monetary" class="oe_inline"/>
+                            <field name="company_currency_id" invisible="1"/>
+                        </setting>
+                        <setting string="Producto del costo de envio"
+                                 help="Producto de servicio que representa el cobro de envio en la orden y factura. Si no hay uno configurado, se crea automaticamente.">
+                            <field name="delivery_fee_product_id"
+                                   options="{'no_create_edit': True}"
+                                   context="{'default_type': 'service', 'default_sale_ok': True, 'default_purchase_ok': False}"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+</odoo>

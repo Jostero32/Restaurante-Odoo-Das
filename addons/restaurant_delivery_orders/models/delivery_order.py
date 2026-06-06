@@ -49,14 +49,6 @@ class RestaurantDeliveryOrder(models.Model):
         default=lambda self: self.env.company.currency_id,
         required=True,
     )
-    delivery_user_id = fields.Many2one("res.users", string="Repartidor", tracking=True)
-    driver_id = fields.Many2one(
-        "res.users",
-        string="Repartidor",
-        related="delivery_user_id",
-        readonly=False,
-        store=False,
-    )
     notes = fields.Text(string="Notas")
     state = fields.Selection(
         [
@@ -78,6 +70,7 @@ class RestaurantDeliveryOrder(models.Model):
         string="Pedido de venta",
         copy=False,
         tracking=True,
+        ondelete="set null",
     )
     is_scheduled = fields.Boolean(
         string="Programado",
@@ -369,6 +362,11 @@ class RestaurantDeliveryOrder(models.Model):
                     order.sudo().message_unsubscribe(partner_ids=[stale_partner.id])
 
     def _notify_internal_new_website_order(self):
+        """Al recibir un pedido web, notifica SOLO a quienes deben asignar
+        repartidor (cocina + administracion + administrador). Los repartidores
+        no se notifican aqui: recibiran su actividad cuando se les asigne
+        especificamente el pedido (ver action_assign / _notify_driver_assigned).
+        """
         website_orders = self.filtered(lambda order: order.sale_order_id and order.sale_order_id.website_id)
         if not website_orders:
             return
@@ -439,6 +437,67 @@ class RestaurantDeliveryOrder(models.Model):
         if activity_vals:
             self.env["mail.activity"].sudo().create(activity_vals)
 
+    def _notify_driver_assigned(self, previous_driver_id=None):
+        """Notifica al repartidor recien asignado y limpia actividades viejas
+        de otros repartidores sobre este mismo pedido. Asi solo el repartidor
+        actual ve la tarea pendiente.
+        """
+        todo_type = self.env.ref("mail.mail_activity_data_todo", raise_if_not_found=False)
+        repartidor_group = self.env.ref(
+            "restaurant_casa_vieja_base.group_restaurant_repartidor", raise_if_not_found=False
+        )
+        if not todo_type or not repartidor_group:
+            return
+
+        model_id = self.env["ir.model"]._get_id("restaurant.delivery.order")
+        deadline = fields.Date.context_today(self)
+        repartidor_user_ids = repartidor_group.sudo().users.ids
+
+        for order in self:
+            if not order.driver_id:
+                continue
+
+            # 1) Limpiar actividades viejas dirigidas a otros repartidores
+            old_activities = self.env["mail.activity"].sudo().search([
+                ("res_model", "=", "restaurant.delivery.order"),
+                ("res_id", "=", order.id),
+                ("user_id", "in", repartidor_user_ids),
+                ("user_id", "!=", order.driver_id.id),
+            ])
+            if old_activities:
+                old_activities.unlink()
+
+            # 2) Crear actividad para el repartidor asignado
+            existing = self.env["mail.activity"].sudo().search([
+                ("res_model", "=", "restaurant.delivery.order"),
+                ("res_id", "=", order.id),
+                ("user_id", "=", order.driver_id.id),
+                ("activity_type_id", "=", todo_type.id),
+            ], limit=1)
+            if not existing:
+                self.env["mail.activity"].sudo().create({
+                    "activity_type_id": todo_type.id,
+                    "res_model_id": model_id,
+                    "res_id": order.id,
+                    "user_id": order.driver_id.id,
+                    "summary": _("Pedido asignado para entrega"),
+                    "note": _(
+                        "Se te asigno el pedido %s. Coordinar recogida con cocina y entregar."
+                    ) % order.name,
+                    "date_deadline": deadline,
+                })
+
+            # 3) Mensaje en chatter dirigido al repartidor asignado
+            partner_ids = [order.driver_id.partner_id.id] if order.driver_id.partner_id else []
+            order.sudo().message_post(
+                body=_(
+                    "Pedido asignado al repartidor: %s."
+                ) % order.driver_id.name,
+                partner_ids=partner_ids,
+                message_type="comment",
+                subtype_xmlid="mail.mt_comment",
+            )
+
     def write(self, vals):
         previous_states = {order.id: order.state for order in self}
         previous_drivers = {order.id: order.driver_id for order in self}
@@ -462,6 +521,13 @@ class RestaurantDeliveryOrder(models.Model):
         )
         if followers_changed:
             followers_changed._sync_chat_followers(previous_driver_by_order=previous_drivers)
+        # Si cambio el repartidor asignado: notificar al nuevo y limpiar viejos.
+        if "driver_id" in vals:
+            driver_changed = self.filtered(
+                lambda o: previous_drivers.get(o.id) != o.driver_id and o.driver_id
+            )
+            if driver_changed:
+                driver_changed._notify_driver_assigned()
         return result
 
     def unlink(self):

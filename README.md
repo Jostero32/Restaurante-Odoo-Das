@@ -39,6 +39,7 @@ El alcance documentado se limita a lo que existe actualmente en el código:
 - Módulo base del restaurante (`restaurant_casa_vieja_base`).
 - Módulo de pedidos a domicilio (`restaurant_delivery_orders`).
 - Módulo de reservas de mesa (`restaurant_table_reservations`).
+- Módulo de gestión de tareas (`task_management_dashboard`).
 - Integración de pago **Kushki** (`pay_kushki`) como integración complementaria
   asociada al flujo de delivery/e-commerce.
 
@@ -65,6 +66,7 @@ El alcance documentado se limita a lo que existe actualmente en el código:
 | `restaurant_casa_vieja_base`    | Base común     | Categoría, grupos de seguridad y menú raíz del restaurante. |
 | `restaurant_delivery_orders`    | Principal      | Pedidos a domicilio, repartidores, incidencias, calificaciones, horarios, facturación y portal. |
 | `restaurant_table_reservations` | Principal      | Reservas de mesa, zonas, mesas, pre-orden, arreglos especiales e integración POS. |
+| `task_management_dashboard`     | Productividad  | Gestión de tareas con responsable/asignados, estados, prioridades y dashboard analítico. |
 | `pay_kushki`                    | Integración    | Proveedor de pago Kushki para el flujo de e-commerce/delivery. |
 
 Detalle técnico en [docs/03_documentacion_tecnica.md](docs/03_documentacion_tecnica.md).
@@ -161,6 +163,7 @@ Restaurante-Odoo-Das/
 │   ├── restaurant_casa_vieja_base/
 │   ├── restaurant_delivery_orders/
 │   ├── restaurant_table_reservations/
+│   ├── task_management_dashboard/
 │   └── pay_kushki/
 ├── scripts/                    # Scripts operativos (backup, restore, altas)
 │   ├── backup.sh
@@ -186,11 +189,11 @@ Restaurante-Odoo-Das/
 
 ```bash
 # Actualizar un módulo específico
-docker compose exec odoo odoo -d odoo -u restaurant_delivery_orders --stop-after-init
+docker compose exec odoo /entrypoint.sh odoo -d odoo -u restaurant_delivery_orders --stop-after-init
 
 # Actualizar todos los módulos personalizados
-docker compose exec odoo odoo -d odoo \
-  -u restaurant_casa_vieja_base,restaurant_delivery_orders,restaurant_table_reservations \
+docker compose exec odoo /entrypoint.sh odoo -d odoo \
+  -u restaurant_casa_vieja_base,restaurant_delivery_orders,restaurant_table_reservations,task_management_dashboard \
   --stop-after-init
 ```
 

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_move_form_sri_ec" model="ir.ui.view">
+        <field name="name">account.move.form.sri.ec</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Botones en la cabecera -->
+            <xpath expr="//header/button[@name='action_post']" position="after">
+                <button name="action_send_sri"
+                        string="Enviar al SRI"
+                        type="object"
+                        class="btn-primary"
+                        invisible="state != 'posted' or move_type not in ['out_invoice', 'out_refund']"
+                        groups="account.group_account_invoice"/>
+                <button name="action_check_authorization"
+                        string="Consultar Autorización"
+                        type="object"
+                        invisible="l10n_ec_sri_status != 'sent'"
+                        groups="account.group_account_invoice"/>
+            </xpath>
+
+            <!-- Sección de estado SRI en el formulario -->
+            <xpath expr="//field[@name='payment_reference']" position="after">
+                <field name="l10n_ec_sri_status"
+                       invisible="move_type not in ['out_invoice', 'out_refund']"
+                       widget="badge"
+                       decoration-success="l10n_ec_sri_status == 'authorized'"
+                       decoration-warning="l10n_ec_sri_status == 'sent'"
+                       decoration-danger="l10n_ec_sri_status == 'rejected'"
+                       decoration-info="l10n_ec_sri_status == 'draft'"/>
+                <field name="l10n_ec_sri_access_key"
+                       invisible="not l10n_ec_sri_access_key"
+                       readonly="1"/>
+                <field name="l10n_ec_sri_authorization_number"
+                       invisible="not l10n_ec_sri_authorization_number"
+                       readonly="1"/>
+                <field name="l10n_ec_sri_authorization_date"
+                       invisible="not l10n_ec_sri_authorization_date"
+                       readonly="1"/>
+                <field name="l10n_ec_xml_file"
+                       filename="l10n_ec_xml_filename"
+                       invisible="not l10n_ec_xml_file"
+                       readonly="1"
+                       widget="binary"
+                       string="Descargar XML Firmado"/>
+                <field name="l10n_ec_xml_filename" invisible="1"/>
+            </xpath>
+
+        </field>
+    </record>
+
+    <!-- Acción para envío masivo desde la lista de facturas -->
+    <record id="action_batch_send_sri" model="ir.actions.server">
+        <field name="name">Enviar al SRI</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="binding_model_id" ref="account.model_account_move"/>
+        <field name="binding_view_types">list</field>
+        <field name="state">code</field>
+        <field name="code">action = records.action_batch_send_sri()</field>
+    </record>
+</odoo>

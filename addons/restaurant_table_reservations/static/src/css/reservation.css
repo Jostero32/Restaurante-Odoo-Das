@@ -1,43 +1,65 @@
-.o_reservation_page {
-    background: linear-gradient(180deg, #f7f2eb 0%, #ffffff 35%);
-    color: #27231f;
+/* ─────────────────────────────────────────────────────────────────────────────
+   Paleta de marca — Casa Vieja (alineada con portal_delivery.scss)
+   ───────────────────────────────────────────────────────────────────────────── */
+:root {
+    --rcv-gold:       #B58A3D;
+    --rcv-gold-dark:  #8A6520;
+    --rcv-gold-light: #F5E8C8;
+    --rcv-brown:      #2C1A0E;
+    --rcv-brown-mid:  #6A5240;
+    --rcv-cream:      #FAF7F0;
+    --rcv-sand:       #E8DCCB;
+    --rcv-text:       #1A1209;
+    --rcv-text-muted: #7A6A56;
+    --rcv-white:      #FFFFFF;
 }
 
+/* ─── Página de reservas ─────────────────────────────────────────────────── */
+.o_reservation_page {
+    background: linear-gradient(180deg, #f7f2eb 0%, #ffffff 40%);
+    color: var(--rcv-text);
+}
+
+/* ─── Hero header ────────────────────────────────────────────────────────── */
 .o_reservation_hero {
     padding: 4.5rem 0 2.5rem;
-    background: radial-gradient(circle at top left, rgba(189, 155, 119, 0.2), transparent 35%),
-        linear-gradient(135deg, #3d332d 0%, #6a5240 100%);
+    background: radial-gradient(circle at top left, rgba(181, 138, 61, 0.18), transparent 40%),
+        linear-gradient(135deg, #2C1A0E 0%, #6A5240 100%);
     color: #fff7ef;
 }
 
 .o_reservation_hero h1 {
-    font-size: clamp(2.5rem, 4vw, 4.25rem);
-    font-weight: 700;
-    margin-bottom: 1rem;
+    font-size: clamp(2.2rem, 4vw, 4rem);
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.01em;
 }
 
 .o_reservation_kicker {
     letter-spacing: 0.2em;
     text-transform: uppercase;
-    font-size: 0.8rem;
-    opacity: 0.85;
+    font-size: 0.78rem;
+    opacity: 0.8;
+    font-weight: 600;
 }
 
+/* ─── Contenido principal ────────────────────────────────────────────────── */
 .o_reservation_content {
     margin-top: -1.5rem;
     padding-bottom: 4rem;
 }
 
+/* ─── Tarjeta del formulario y sidebar ──────────────────────────────────── */
 .o_reservation_form,
 .o_reservation_sidebar,
 .o_sidebar_card {
     border-radius: 1.25rem;
-    background: #fff;
-    box-shadow: 0 1.2rem 3rem rgba(62, 46, 34, 0.08);
+    background: var(--rcv-white);
+    box-shadow: 0 1rem 2.5rem rgba(44, 26, 14, 0.09);
 }
 
 .o_reservation_form {
-    padding: 1.5rem;
+    padding: 1.75rem;
 }
 
 .o_reservation_sidebar {
@@ -49,53 +71,275 @@
 .o_sidebar_card {
     padding: 1rem;
     margin-top: 1rem;
-    border: 1px solid rgba(107, 83, 63, 0.1);
+    border: 1px solid var(--rcv-sand);
 }
 
+/* ─── Grid de mesas disponibles ──────────────────────────────────────────── */
 .o_table_results {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 0.85rem;
     min-height: 3rem;
 }
 
 .o_table_card {
-    border: 1px solid rgba(107, 83, 63, 0.16);
+    border: 2px solid var(--rcv-sand);
     border-radius: 1rem;
     padding: 1rem;
-    background: #fffdf9;
+    background: var(--rcv-cream);
     text-align: left;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    gap: 0.3rem;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
 
-.o_table_card:hover,
+.o_table_card:hover {
+    border-color: var(--rcv-gold);
+    background: #fffdf8;
+    box-shadow: 0 0.8rem 1.8rem rgba(181, 138, 61, 0.15);
+    transform: translateY(-2px);
+}
+
 .o_table_card.is-selected {
-    border-color: #b87a4b;
-    box-shadow: 0 1rem 2rem rgba(184, 122, 75, 0.18);
+    border-color: var(--rcv-brown-mid);
+    background: var(--rcv-gold-light);
+    box-shadow: 0 0.8rem 1.8rem rgba(106, 82, 64, 0.18);
     transform: translateY(-2px);
 }
 
 .o_table_card_name {
-    font-weight: 700;
-    font-size: 1.05rem;
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--rcv-brown);
 }
 
 .o_table_card_meta,
-.o_table_card_notes,
-.o_reservation_summary {
-    font-size: 0.92rem;
-    color: #62584f;
+.o_table_card_notes {
+    font-size: 0.875rem;
+    color: var(--rcv-text-muted);
 }
 
+/* ─── Resumen de reserva (badge en sidebar) ──────────────────────────────── */
 .o_reservation_summary {
-    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    color: var(--rcv-brown-mid);
+    padding: 0.75rem 1.1rem;
     border-radius: 999px;
-    background: #f7efe6;
+    background: var(--rcv-gold-light);
+    border: 1px solid var(--rcv-sand);
 }
 
+/* ─── Catálogo de pre-orden ──────────────────────────────────────────────── */
+.o_preorder_catalog {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 0.85rem;
+}
+
+.o_preorder_card {
+    border: 1px solid var(--rcv-sand);
+    border-radius: 1rem;
+    overflow: hidden;
+    background: var(--rcv-white);
+    transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.o_preorder_card:hover {
+    box-shadow: 0 0.6rem 1.5rem rgba(44, 26, 14, 0.1);
+    transform: translateY(-2px);
+}
+
+.o_preorder_card img {
+    width: 100%;
+    height: 110px;
+    object-fit: cover;
+    display: block;
+}
+
+.o_preorder_card_body {
+    padding: 0.75rem;
+}
+
+.o_preorder_qty_controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.o_preorder_qty {
+    min-width: 20px;
+    text-align: center;
+    font-weight: 800;
+    color: var(--rcv-brown);
+}
+
+/* ─── Barra flotante de total pre-orden ──────────────────────────────────── */
+.o_preorder_total_bar {
+    position: sticky;
+    bottom: 1rem;
+    z-index: 10;
+    background: var(--rcv-brown);
+    color: var(--rcv-white);
+    border-radius: 999px;
+    padding: 0.75rem 1.25rem;
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    box-shadow: 0 0.5rem 1.5rem rgba(44, 26, 14, 0.3);
+    font-weight: 600;
+}
+
+/* ─── Catálogo de arreglos / decoraciones ────────────────────────────────── */
+.o_arrangement_catalog {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: 0.85rem;
+}
+
+.o_arrangement_card {
+    display: flex;
+    flex-direction: column;
+    background: var(--rcv-white);
+    border: 2px solid var(--rcv-sand);
+    border-radius: 0.9rem;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+    position: relative;
+}
+
+.o_arrangement_card:hover {
+    border-color: var(--rcv-gold);
+    box-shadow: 0 4px 16px rgba(181, 138, 61, 0.16);
+    transform: translateY(-2px);
+}
+
+.o_arrangement_card.is-selected {
+    border-color: var(--rcv-brown-mid);
+    box-shadow: 0 0 0 3px rgba(106, 82, 64, 0.2);
+}
+
+.o_arrangement_card.is-selected::before {
+    content: "\f00c";
+    font-family: "FontAwesome";
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    background: var(--rcv-brown-mid);
+    color: var(--rcv-white);
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.78rem;
+    z-index: 2;
+}
+
+.o_arrangement_card img {
+    width: 100%;
+    height: 110px;
+    object-fit: cover;
+    background: var(--rcv-cream);
+}
+
+.o_arrangement_card_body {
+    padding: 0.6rem 0.75rem 0.75rem;
+}
+
+.o_arrangement_card_body h6 {
+    font-size: 0.9rem;
+    margin: 0 0 0.2rem;
+    color: var(--rcv-brown);
+    font-weight: 700;
+}
+
+.o_arrangement_card.o_arrangement_none {
+    align-items: center;
+    justify-content: center;
+    min-height: 145px;
+    border-style: dashed;
+    background: #faf6f0;
+}
+
+.o_arrangement_card.o_arrangement_none.is-selected {
+    background: var(--rcv-gold-light);
+}
+
+.o_arrangement_card_none {
+    color: var(--rcv-brown-mid);
+    text-align: center;
+    padding: 1rem;
+}
+
+/* ─── Portal de reservas (lista y detalle) ───────────────────────────────── */
+.rcv-reservation-card {
+    border-radius: 14px;
+    border-left: 3px solid transparent;
+    transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.rcv-reservation-card:hover {
+    border-left-color: var(--rcv-gold);
+    box-shadow: 0 0.75rem 1.8rem rgba(44, 26, 14, 0.12) !important;
+}
+
+.rcv-reservation-info-block {
+    border: 1px solid var(--rcv-sand);
+    border-radius: 10px;
+    padding: 0.75rem 0.9rem;
+    background: var(--rcv-white);
+    height: 100%;
+}
+
+.rcv-reservation-info-block .rcv-info-label {
+    display: block;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    color: var(--rcv-text-muted);
+    margin-bottom: 0.25rem;
+}
+
+.rcv-reservation-info-block .rcv-info-value {
+    font-weight: 600;
+    color: var(--rcv-text);
+    font-size: 0.95rem;
+}
+
+/* ─── Botones de marca ───────────────────────────────────────────────────── */
+.btn-rcv-gold {
+    background-color: var(--rcv-gold);
+    border-color: var(--rcv-gold);
+    color: var(--rcv-white);
+    font-weight: 600;
+}
+
+.btn-rcv-gold:hover,
+.btn-rcv-gold:focus {
+    background-color: var(--rcv-gold-dark);
+    border-color: var(--rcv-gold-dark);
+    color: var(--rcv-white);
+}
+
+.btn-outline-rcv-gold {
+    border: 1.5px solid var(--rcv-gold);
+    color: var(--rcv-gold-dark);
+    background: transparent;
+    font-weight: 600;
+}
+
+.btn-outline-rcv-gold:hover {
+    background-color: var(--rcv-gold-light);
+    border-color: var(--rcv-gold);
+    color: var(--rcv-gold-dark);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 991.98px) {
     .o_reservation_sidebar {
         position: static;

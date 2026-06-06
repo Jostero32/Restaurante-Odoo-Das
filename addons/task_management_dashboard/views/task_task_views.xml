@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_task_management_task_list" model="ir.ui.view">
+        <field name="name">task.management.task.list</field>
+        <field name="model">task.management.task</field>
+        <field name="arch" type="xml">
+            <list string="Tareas" decoration-danger="is_overdue" decoration-success="state == 'done'" decoration-muted="state == 'cancelled'">
+                <field name="priority" widget="priority"/>
+                <field name="name"/>
+                <field name="responsible_id"/>
+                <field name="assignee_ids" widget="many2many_tags"/>
+                <field name="date_deadline"/>
+                <field name="days_to_deadline"/>
+                <field name="state" widget="badge"
+                    decoration-primary="state == 'pending'"
+                    decoration-warning="state == 'blocked'"
+                    decoration-success="state == 'done'"
+                    decoration-danger="state == 'cancelled'"/>
+                <field name="date_completed"/>
+                <field name="is_overdue" optional="hide"/>
+                <field name="active" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_task_management_task_form" model="ir.ui.view">
+        <field name="name">task.management.task.form</field>
+        <field name="model">task.management.task</field>
+        <field name="arch" type="xml">
+            <form string="Tarea">
+                <header>
+                    <button name="action_set_pending" type="object" string="Marcar Pendiente" class="btn-primary" invisible="state == 'pending'"/>
+                    <button name="action_set_in_progress" type="object" string="Iniciar" class="btn-primary" invisible="state not in ('pending', 'blocked')"/>
+                    <button name="action_set_blocked" type="object" string="Bloquear" invisible="state != 'in_progress'"/>
+                    <button name="action_set_done" type="object" string="Finalizar" class="btn-primary" invisible="state in ('done', 'cancelled')"/>
+                    <button name="action_set_cancelled" type="object" string="Cancelar" invisible="state in ('done', 'cancelled')"/>
+                    <field name="state" widget="statusbar" statusbar_visible="pending,in_progress,blocked,done,cancelled"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="responsible_id"/>
+                            <field name="assignee_ids" widget="many2many_tags" options="{'no_create_edit': False}"/>
+                            <field name="company_id" groups="base.group_multi_company"/>
+                        </group>
+                        <group>
+                            <field name="priority" widget="priority"/>
+                            <field name="date_deadline"/>
+                            <field name="date_completed" readonly="1"/>
+                            <field name="is_overdue" readonly="1"/>
+                            <field name="days_to_deadline" readonly="1"/>
+                            <field name="active"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Descripcion">
+                            <field name="description" placeholder="Detalle de la tarea..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_task_management_task_kanban" model="ir.ui.view">
+        <field name="name">task.management.task.kanban</field>
+        <field name="model">task.management.task</field>
+        <field name="arch" type="xml">
+            <kanban class="o_kanban_small_column" default_group_by="state" color="color">
+                <field name="name"/>
+                <field name="responsible_id"/>
+                <field name="assignee_ids"/>
+                <field name="date_deadline"/>
+                <field name="days_to_deadline"/>
+                <field name="priority"/>
+                <field name="is_overdue"/>
+                <field name="state"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <strong><field name="name"/></strong>
+                                <field name="priority" widget="priority"/>
+                            </div>
+                            <div class="mb-1">
+                                <span class="text-muted">Responsable:</span>
+                                <field name="responsible_id"/>
+                            </div>
+                            <div class="mb-1">
+                                <span class="text-muted">Vence:</span>
+                                <field name="date_deadline"/>
+                            </div>
+                            <div class="mb-1" invisible="state in ('done', 'cancelled')">
+                                <span class="text-muted">Dias restantes:</span>
+                                <field name="days_to_deadline"/>
+                            </div>
+                            <div class="text-danger" invisible="not is_overdue">
+                                Tarea atrasada
+                            </div>
+                            <div class="mt-2">
+                                <field name="assignee_ids" widget="many2many_tags"/>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <record id="view_task_management_task_calendar" model="ir.ui.view">
+        <field name="name">task.management.task.calendar</field>
+        <field name="model">task.management.task</field>
+        <field name="arch" type="xml">
+            <calendar string="Calendario de tareas" date_start="date_deadline" color="responsible_id" mode="month" quick_create="0">
+                <field name="name"/>
+                <field name="priority"/>
+                <field name="state"/>
+            </calendar>
+        </field>
+    </record>
+
+    <record id="view_task_management_task_pivot" model="ir.ui.view">
+        <field name="name">task.management.task.pivot</field>
+        <field name="model">task.management.task</field>
+        <field name="arch" type="xml">
+            <pivot string="Analitica de tareas">
+                <field name="state" type="row"/>
+                <field name="responsible_id" type="row"/>
+                <field name="priority" type="col"/>
+                <field name="id" type="measure" string="Cantidad"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="view_task_management_task_graph" model="ir.ui.view">
+        <field name="name">task.management.task.graph</field>
+        <field name="model">task.management.task</field>
+        <field name="arch" type="xml">
+            <graph string="Resumen de tareas" type="bar">
+                <field name="state"/>
+                <field name="id" type="measure" string="Cantidad"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="view_task_management_task_search" model="ir.ui.view">
+        <field name="name">task.management.task.search</field>
+        <field name="model">task.management.task</field>
+        <field name="arch" type="xml">
+            <search string="Buscar tareas">
+                <field name="name"/>
+                <field name="responsible_id"/>
+                <field name="assignee_ids"/>
+                <field name="state"/>
+                <field name="priority"/>
+                <field name="date_deadline"/>
+
+                <filter name="open_tasks" string="Abiertas" domain="[('state', 'not in', ('done', 'cancelled'))]"/>
+                <filter name="done_tasks" string="Finalizadas" domain="[('state', '=', 'done')]"/>
+                <filter name="cancelled_tasks" string="Canceladas" domain="[('state', '=', 'cancelled')]"/>
+                <filter name="done_last_30" string="Finalizadas ultimos 30 dias" domain="[('state', '=', 'done'), ('date_completed', '&gt;=', (context_today() - relativedelta(days=30)).strftime('%Y-%m-%d'))]"/>
+                <filter name="overdue_tasks" string="Atrasadas" domain="[('date_deadline', '&lt;', context_today()), ('state', 'not in', ('done', 'cancelled'))]"/>
+                <filter name="due_today" string="Vencen hoy" domain="[('date_deadline', '=', context_today()), ('state', 'not in', ('done', 'cancelled'))]"/>
+                <filter name="due_next_7" string="Proximos 7 dias" domain="[('date_deadline', '&gt;', context_today()), ('date_deadline', '&lt;=', (context_today() + relativedelta(days=7)).strftime('%Y-%m-%d')), ('state', 'not in', ('done', 'cancelled'))]"/>
+
+                <separator/>
+
+                <filter name="group_state" string="Estado" context="{'group_by': 'state'}"/>
+                <filter name="group_responsible" string="Responsable" context="{'group_by': 'responsible_id'}"/>
+                <filter name="group_priority" string="Prioridad" context="{'group_by': 'priority'}"/>
+                <filter name="group_deadline" string="Fecha limite" context="{'group_by': 'date_deadline:day'}"/>
+                <filter name="group_completed_month" string="Mes finalizacion" context="{'group_by': 'date_completed:month'}"/>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_task_management_task" model="ir.actions.act_window">
+        <field name="name">Tareas</field>
+        <field name="res_model">task.management.task</field>
+        <field name="view_mode">kanban,list,form,calendar,pivot,graph,activity</field>
+        <field name="search_view_id" ref="view_task_management_task_search"/>
+        <field name="context">{'default_state': 'pending', 'default_priority': '1', 'search_default_open_tasks': 1}</field>
+    </record>
+</odoo>

@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================ -->
+    <!-- Vista Tree                                                    -->
+    <!-- ============================================================ -->
+    <record id="view_kitchen_order_tree" model="ir.ui.view">
+        <field name="name">restaurant.kitchen.order.tree</field>
+        <field name="model">restaurant.kitchen.order</field>
+        <field name="arch" type="xml">
+            <list string="Ordenes de Cocina"
+                  decoration-info="state == 'new'"
+                  decoration-warning="state == 'preparing'"
+                  decoration-success="state == 'ready'"
+                  decoration-muted="state in ('served','cancelled')">
+                <field name="name"/>
+                <field name="origin_type"/>
+                <field name="table_id" optional="show"/>
+                <field name="partner_id" optional="show"/>
+                <field name="waiter_user_id" optional="hide"/>
+                <field name="state"
+                       widget="badge"
+                       decoration-info="state == 'new'"
+                       decoration-warning="state == 'preparing'"
+                       decoration-success="state == 'ready'"
+                       decoration-muted="state in ('served','cancelled')"/>
+                <field name="sent_at"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Vista Form                                                    -->
+    <!-- ============================================================ -->
+    <record id="view_kitchen_order_form" model="ir.ui.view">
+        <field name="name">restaurant.kitchen.order.form</field>
+        <field name="model">restaurant.kitchen.order</field>
+        <field name="arch" type="xml">
+            <form string="Orden de Cocina">
+                <header>
+                    <button name="action_start"
+                            string="Iniciar Preparacion"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'new'"/>
+                    <button name="action_ready"
+                            string="Marcar Lista"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'preparing'"/>
+                    <button name="action_served"
+                            string="Marcar Servida"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'ready' or origin_type == 'delivery'"/>
+                    <button name="action_served"
+                            string="Marcar Despachada"
+                            type="object"
+                            class="oe_highlight"
+                            invisible="state != 'ready' or origin_type != 'delivery'"/>
+                    <button name="action_cancel"
+                            string="Cancelar"
+                            type="object"
+                            invisible="state in ('served','cancelled')"/>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="new,preparing,ready,served"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" readonly="1"/>
+                        </h1>
+                    </div>
+                    <group>
+                        <group string="Origen">
+                            <field name="origin_type"/>
+                            <field name="pos_order_id"
+                                   invisible="origin_type != 'pos'"/>
+                            <field name="delivery_order_id"
+                                   invisible="origin_type != 'delivery'"/>
+                            <field name="sale_order_id"/>
+                            <field name="pos_session_id"
+                                   invisible="origin_type != 'pos'"/>
+                        </group>
+                        <group string="Informacion">
+                            <field name="table_id"/>
+                            <field name="partner_id"/>
+                            <field name="waiter_user_id"/>
+                        </group>
+                    </group>
+                    <group>
+                        <group string="Tiempos">
+                            <field name="sent_at"/>
+                            <field name="started_at"/>
+                            <field name="ready_at"/>
+                            <field name="served_at"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Lineas" name="lines">
+                            <field name="line_ids">
+                                <list editable="bottom">
+                                    <field name="product_id"/>
+                                    <field name="quantity"/>
+                                    <field name="uom_id"/>
+                                    <field name="line_note"/>
+                                    <field name="state"
+                                           widget="badge"
+                                           decoration-info="state == 'new'"
+                                           decoration-warning="state == 'preparing'"
+                                           decoration-success="state == 'ready'"
+                                           decoration-muted="state in ('served','cancelled')"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Notas" name="notes">
+                            <field name="notes" placeholder="Notas internas..."/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Vista Kanban                                                  -->
+    <!-- ============================================================ -->
+    <record id="view_kitchen_order_kanban" model="ir.ui.view">
+        <field name="name">restaurant.kitchen.order.kanban</field>
+        <field name="model">restaurant.kitchen.order</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="state"
+                    class="o_kanban_small_column"
+                    quick_create="false"
+                    records_draggable="false">
+                <field name="name"/>
+                <field name="origin_type"/>
+                <field name="table_id"/>
+                <field name="partner_id"/>
+                <field name="state"/>
+                <field name="sent_at"/>
+                <field name="line_ids"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="o_kanban_card_header">
+                            <strong>
+                                <field name="name"/>
+                            </strong>
+                            <span class="float-end badge rounded-pill"
+                                  t-attf-class="#{record.state.raw_value == 'new' ? 'text-bg-info' : record.state.raw_value == 'preparing' ? 'text-bg-warning' : record.state.raw_value == 'ready' ? 'text-bg-success' : 'text-bg-secondary'}">
+                                <field name="state"/>
+                            </span>
+                        </div>
+                        <div class="o_kanban_card_content">
+                            <div t-if="record.table_id.value">
+                                <i class="fa fa-cutlery me-1" title="Mesa"/>
+                                <field name="table_id"/>
+                            </div>
+                            <div t-if="record.partner_id.value">
+                                <i class="fa fa-user me-1" title="Cliente"/>
+                                <field name="partner_id"/>
+                            </div>
+                            <div>
+                                <i class="fa fa-tag me-1" title="Origen"/>
+                                <field name="origin_type"/>
+                            </div>
+                            <div class="text-muted mt-1">
+                                <i class="fa fa-clock-o me-1" title="Enviada"/>
+                                <field name="sent_at" widget="relative"/>
+                            </div>
+                        </div>
+                        <div class="o_kanban_card_footer">
+                            <div class="btn-group">
+                                <button t-if="record.state.raw_value == 'new'"
+                                        name="action_start"
+                                        type="object"
+                                        class="btn btn-sm btn-primary">
+                                    <i class="fa fa-play"/> Iniciar
+                                </button>
+                                <button t-if="record.state.raw_value == 'preparing'"
+                                        name="action_ready"
+                                        type="object"
+                                        class="btn btn-sm btn-success">
+                                    <i class="fa fa-check"/> Lista
+                                </button>
+                                <button t-if="record.state.raw_value == 'ready' and record.origin_type.raw_value != 'delivery'"
+                                        name="action_served"
+                                        type="object"
+                                        class="btn btn-sm btn-info">
+                                    <i class="fa fa-hand-paper-o"/> Servida
+                                </button>
+                                <button t-if="record.state.raw_value == 'ready' and record.origin_type.raw_value == 'delivery'"
+                                        name="action_served"
+                                        type="object"
+                                        class="btn btn-sm btn-info">
+                                    <i class="fa fa-truck"/> Despachada
+                                </button>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Vista Search                                                  -->
+    <!-- ============================================================ -->
+    <record id="view_kitchen_order_search" model="ir.ui.view">
+        <field name="name">restaurant.kitchen.order.search</field>
+        <field name="model">restaurant.kitchen.order</field>
+        <field name="arch" type="xml">
+            <search string="Buscar Ordenes de Cocina">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="table_id"/>
+                <filter name="filter_new"
+                        string="Nuevas"
+                        domain="[('state','=','new')]"/>
+                <filter name="filter_preparing"
+                        string="En Preparacion"
+                        domain="[('state','=','preparing')]"/>
+                <filter name="filter_ready"
+                        string="Listas"
+                        domain="[('state','=','ready')]"/>
+                <filter name="filter_served"
+                        string="Servidas"
+                        domain="[('state','=','served')]"/>
+                <filter name="filter_cancelled"
+                        string="Canceladas"
+                        domain="[('state','=','cancelled')]"/>
+                <separator/>
+                <filter name="filter_pos"
+                        string="Desde POS"
+                        domain="[('origin_type','=','pos')]"/>
+                <filter name="filter_delivery"
+                        string="Desde Delivery"
+                        domain="[('origin_type','=','delivery')]"/>
+                <filter name="filter_manual"
+                        string="Manuales"
+                        domain="[('origin_type','=','manual')]"/>
+                <separator/>
+                <group expand="0" string="Agrupar por">
+                    <filter name="groupby_state"
+                            string="Estado"
+                            context="{'group_by': 'state'}"/>
+                    <filter name="groupby_table"
+                            string="Mesa"
+                            context="{'group_by': 'table_id'}"/>
+                    <filter name="groupby_origin"
+                            string="Origen"
+                            context="{'group_by': 'origin_type'}"/>
+                    <filter name="groupby_waiter"
+                            string="Mesero"
+                            context="{'group_by': 'waiter_user_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- ============================================================ -->
+    <!-- Action Window                                                 -->
+    <!-- ============================================================ -->
+    <record id="action_kitchen_order" model="ir.actions.act_window">
+        <field name="name">Ordenes de Cocina</field>
+        <field name="res_model">restaurant.kitchen.order</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_kitchen_order_search"/>
+        <field name="context">{'search_default_groupby_state': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No hay ordenes de cocina todavia
+            </p>
+            <p>
+                Las ordenes se crean automaticamente desde POS o delivery,
+                o puede crear una orden manual.
+            </p>
+        </field>
+    </record>
+
+</odoo>

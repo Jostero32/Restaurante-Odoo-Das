@@ -16,6 +16,46 @@ class ResCompany(models.Model):
         domain="[('sale_ok', '=', True), ('type', '=', 'service'), '|', ('company_id', '=', False), ('company_id', '=', id)]",
         help="Producto de servicio usado para reflejar el costo de envio en la orden y factura.",
     )
+    restaurant_delivery_carrier_id = fields.Many2one(
+        "delivery.carrier",
+        string="Carrier delivery restaurante",
+        copy=False,
+        help="Carrier de Odoo gestionado automáticamente para mostrar el costo de envío en el checkout.",
+    )
+
+    def write(self, vals):
+        result = super().write(vals)
+        if {"delivery_fixed_fee", "delivery_fee_product_id"}.intersection(vals):
+            for company in self:
+                company._sync_restaurant_delivery_carrier()
+        return result
+
+    def _sync_restaurant_delivery_carrier(self):
+        """Crea o actualiza el delivery.carrier de Odoo sincronizado con nuestro fee fijo."""
+        product = self.delivery_fee_product_id
+        if not product:
+            return
+
+        fee = self.delivery_fixed_fee or 0.0
+
+        Carrier = self.env["delivery.carrier"].sudo()
+        carrier = self.restaurant_delivery_carrier_id
+
+        if carrier:
+            carrier.write({
+                "product_id": product.id,
+                "fixed_price": fee,
+                "active": True,
+            })
+        else:
+            carrier = Carrier.create({
+                "name": "Envío a domicilio",
+                "delivery_type": "fixed",
+                "product_id": product.id,
+                "fixed_price": fee,
+                "is_published": True,
+            })
+            self.sudo().restaurant_delivery_carrier_id = carrier
 
     def _get_or_create_delivery_fee_product(self):
         self.ensure_one()

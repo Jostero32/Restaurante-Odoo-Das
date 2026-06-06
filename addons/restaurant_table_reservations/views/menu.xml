@@ -22,4 +22,19 @@
         action="action_restaurant_tables"
         groups="restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
         sequence="20"/>
+
+    <menuitem
+        id="menu_restaurant_reservations_configuration"
+        name="Configuracion"
+        parent="menu_restaurant_reservations_root"
+        groups="restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
+        sequence="90"/>
+
+    <menuitem
+        id="menu_restaurant_reservations_schedule"
+        name="Horario"
+        parent="menu_restaurant_reservations_configuration"
+        action="restaurant_delivery_orders.action_restaurant_delivery_schedule"
+        groups="restaurant_casa_vieja_base.group_restaurant_administracion,restaurant_casa_vieja_base.group_restaurant_administrador"
+        sequence="10"/>
 </odoo>

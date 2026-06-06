@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_l10n_ec_certificate_form" model="ir.ui.view">
+        <field name="name">l10n_ec.certificate.form</field>
+        <field name="model">l10n_ec.certificate</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_validate" string="Validar Certificado"
+                            type="object" class="btn-primary"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,active,expired,invalid"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Identificación">
+                            <field name="name"/>
+                            <field name="company_id"/>
+                        </group>
+                        <group string="Archivo">
+                            <field name="content" filename="file_name" widget="binary"
+                                   string="Archivo .p12"/>
+                            <field name="file_name" invisible="1"/>
+                            <field name="password" password="True"/>
+                        </group>
+                    </group>
+                    <group string="Información del Certificado">
+                        <field name="subject_cn" readonly="1"/>
+                        <field name="date_start" readonly="1"/>
+                        <field name="date_end" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_l10n_ec_certificate_list" model="ir.ui.view">
+        <field name="name">l10n_ec.certificate.list</field>
+        <field name="model">l10n_ec.certificate</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="company_id" groups="base.group_multi_company"/>
+                <field name="subject_cn"/>
+                <field name="date_start"/>
+                <field name="date_end"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'active'"
+                       decoration-warning="state == 'expired'"
+                       decoration-danger="state == 'invalid'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_l10n_ec_certificate" model="ir.actions.act_window">
+        <field name="name">Certificados Digitales SRI</field>
+        <field name="res_model">l10n_ec.certificate</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="menu_l10n_ec_certificate"
+              name="Certificados SRI"
+              parent="account.menu_finance_configuration"
+              action="action_l10n_ec_certificate"
+              sequence="200"
+              groups="account.group_account_manager"/>
+</odoo>
