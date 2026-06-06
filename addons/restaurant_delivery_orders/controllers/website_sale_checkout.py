@@ -1,13 +1,23 @@
 from datetime import datetime
 
 from odoo import fields, http
-from odoo.exceptions import UserError
 from odoo.http import request
-from odoo.addons.website_sale.controllers.main import WebsiteSale
+from odoo.addons.l10n_ec_website_sale.controllers.main import L10nECWebsiteSale
+
+# Internal product.category IDs for the restaurant menu tabs (Entradas, Sopas, …)
+_MENU_CATEGS = [
+    (27, "Entradas"),
+    (28, "Sopas"),
+    (29, "Platos fuertes"),
+    (30, "Postres"),
+    (31, "Bebidas"),
+]
 
 
-class RestaurantDeliveryWebsiteSale(WebsiteSale):
+class RestaurantDeliveryWebsiteSale(L10nECWebsiteSale):
     def _get_mandatory_billing_address_fields(self, country_sudo):
+        # El módulo l10n_ec_website_sale hace vat y l10n_latam_identification_type_id
+        # obligatorios para Ecuador. Los dejamos opcionales para el restaurante.
         mandatory_fields = super()._get_mandatory_billing_address_fields(country_sudo)
         mandatory_fields.discard("vat")
         mandatory_fields.discard("l10n_latam_identification_type_id")
@@ -108,3 +118,32 @@ class RestaurantDeliveryWebsiteSale(WebsiteSale):
             "scheduled_for": order.delivery_scheduled_for.strftime("%Y-%m-%d %H:%M:%S"),
             "scheduled_label": schedule._to_company_local(order.delivery_scheduled_for).strftime("%d/%m %H:%M"),
         }
+
+    # ── Shop: internal-category filtering ────────────────────────────────────
+
+    def _shop_lookup_products(self, attrib_set, options, post, search, website):
+        fuzzy_search_term, product_count, search_result = super()._shop_lookup_products(
+            attrib_set, options, post, search, website
+        )
+        categ_id = post.get("categ_id")
+        if categ_id:
+            try:
+                categ_id_int = int(categ_id)
+                valid_categ_ids = set(
+                    request.env["product.category"].sudo().search(
+                        [("id", "child_of", categ_id_int)]
+                    ).ids
+                )
+                search_result = search_result.filtered(
+                    lambda p: p.categ_id.id in valid_categ_ids
+                )
+                product_count = len(search_result)
+            except (ValueError, TypeError):
+                pass
+        return fuzzy_search_term, product_count, search_result
+
+    def _get_additional_extra_shop_values(self, values, **post):
+        result = super()._get_additional_extra_shop_values(values, **post)
+        result["restaurant_menu_categories"] = _MENU_CATEGS
+        result["restaurant_active_categ_id"] = int(post.get("categ_id") or 0)
+        return result

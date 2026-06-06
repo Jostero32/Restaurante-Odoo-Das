@@ -9,10 +9,12 @@
         "base",
         "mail",
         "portal",
+        "payment",
         "sale_management",
         "account",
         "restaurant_casa_vieja_base",
         "website_sale",
+        "delivery",
         "l10n_ec_website_sale",
     ],
     "data": [
@@ -23,6 +25,7 @@
         "security/ir_rule.xml",
         "security/single_address_storefront.xml",
         "views/res_company_views.xml",
+        "views/res_config_settings_views.xml",
         "views/delivery_order_views.xml",
         "views/delivery_incident_views.xml",
         "views/delivery_rating_views.xml",
@@ -39,6 +42,7 @@
         "web.assets_frontend": [
             "restaurant_delivery_orders/static/src/scss/portal_delivery.scss",
             "restaurant_delivery_orders/static/src/js/checkout_delivery_schedule.js",
+            "restaurant_delivery_orders/static/src/js/checkout_cedula_validation.js",
             "restaurant_delivery_orders/static/src/js/portal_chat_refresh.js",
         ],
     },

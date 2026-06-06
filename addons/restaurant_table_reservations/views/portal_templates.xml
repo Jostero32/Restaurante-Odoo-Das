@@ -41,7 +41,7 @@
             <t t-if="not reservation_rows">
                 <div class="alert alert-light border d-flex justify-content-between align-items-center" role="alert">
                     <span>Aun no tienes reservas en esta categoria.</span>
-                    <a href="/reservas" class="btn btn-primary btn-sm">Reservar mesa</a>
+                    <a href="/reservas" class="btn btn-rcv-gold btn-sm"><i class="fa fa-calendar-plus-o me-1"/>Reservar mesa</a>
                 </div>
             </t>
 
@@ -49,55 +49,65 @@
                 <t t-foreach="reservation_rows" t-as="row">
                     <t t-set="reservation" t-value="row.get('record')"/>
                     <div class="col-12 col-xl-6">
-                        <article class="card border-0 shadow-sm h-100">
+                        <article class="card border-0 shadow-sm h-100 rcv-reservation-card">
                             <div class="card-body">
                                 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                                     <div>
-                                        <h5 class="mb-1 text-dark" t-out="reservation.name"/>
+                                        <h5 class="mb-1 fw-bold" style="color: var(--rcv-brown, #2C1A0E);" t-out="reservation.name"/>
                                         <p class="mb-0 text-muted small">
-                                            <i class="fa fa-clock-o me-1"/>
+                                            <i class="fa fa-calendar me-1"/>
                                             <span t-field="reservation.start_datetime" t-options="{'widget': 'datetime'}"/>
                                         </p>
                                     </div>
-                                    <span t-attf-class="badge rounded-pill text-bg-#{row.get('state_class')}">
+                                    <span t-attf-class="badge rounded-pill text-bg-#{row.get('state_class')} px-3 py-2">
                                         <t t-out="row.get('state_label')"/>
                                     </span>
                                 </div>
 
-                                <div class="row g-2 mt-3 small">
+                                <div class="row g-2 mt-3">
                                     <div class="col-6 col-md-3">
-                                        <div class="text-muted">Personas</div>
-                                        <div class="fw-semibold"><t t-out="reservation.party_size"/></div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="text-muted">Zona</div>
-                                        <div class="fw-semibold">
-                                            <t t-if="reservation.zone == 'main'">Interior</t>
-                                            <t t-if="reservation.zone == 'patio'">Patio</t>
+                                        <div class="rcv-reservation-info-block">
+                                            <span class="rcv-info-label">Personas</span>
+                                            <span class="rcv-info-value"><i class="fa fa-users me-1 opacity-50"/><t t-out="reservation.party_size"/></span>
                                         </div>
                                     </div>
                                     <div class="col-6 col-md-3">
-                                        <div class="text-muted">Mesa</div>
-                                        <div class="fw-semibold"><t t-out="reservation.table_id.table_number or '-'"/></div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="text-muted">Arreglo</div>
-                                        <div class="fw-semibold small">
-                                            <t t-if="reservation.arrangement_product_id"><t t-out="reservation.arrangement_product_id.name"/></t>
-                                            <t t-else=""><t t-out="reservation._get_arrangement_label(reservation.arrangement_type)"/></t>
+                                        <div class="rcv-reservation-info-block">
+                                            <span class="rcv-info-label">Zona</span>
+                                            <span class="rcv-info-value">
+                                                <t t-if="reservation.zone == 'main'">Interior</t>
+                                                <t t-if="reservation.zone == 'patio'">Patio</t>
+                                            </span>
                                         </div>
                                     </div>
-                                    <div t-if="reservation.pre_order_count" class="col-12 col-md-6">
-                                        <div class="text-muted">Pre-orden (se cobra en mesa)</div>
-                                        <div class="fw-semibold">
-                                            <t t-out="reservation.pre_order_count"/> item(s) - <span t-field="reservation.pre_order_total"/>
+                                    <div class="col-6 col-md-3">
+                                        <div class="rcv-reservation-info-block">
+                                            <span class="rcv-info-label">Mesa</span>
+                                            <span class="rcv-info-value"><t t-out="reservation.table_id.table_number or '-'"/></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <div class="rcv-reservation-info-block">
+                                            <span class="rcv-info-label">Arreglo</span>
+                                            <span class="rcv-info-value small">
+                                                <t t-if="reservation.arrangement_product_id"><t t-out="reservation.arrangement_product_id.name"/></t>
+                                                <t t-else=""><t t-out="reservation._get_arrangement_label(reservation.arrangement_type)"/></t>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div t-if="reservation.pre_order_count" class="col-12">
+                                        <div class="rcv-reservation-info-block">
+                                            <span class="rcv-info-label">Pre-orden (se cobra en mesa)</span>
+                                            <span class="rcv-info-value">
+                                                <t t-out="reservation.pre_order_count"/> item(s) — <span t-field="reservation.pre_order_total"/>
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div class="d-flex flex-wrap gap-2 mt-3">
-                                    <a t-att-href="row.get('detail_url')" class="btn btn-outline-dark btn-sm"><i class="fa fa-eye me-1"/>Ver detalle</a>
-                                    <a t-if="row.get('can_cancel')" t-attf-href="/reservas?reschedule_from=#{reservation.id}" class="btn btn-outline-primary btn-sm"><i class="fa fa-pencil me-1"/>Cambiar fecha/hora</a>
+                                    <a t-att-href="row.get('detail_url')" class="btn btn-sm btn-outline-dark"><i class="fa fa-eye me-1"/>Ver detalle</a>
+                                    <a t-if="row.get('can_cancel')" t-attf-href="/reservas?reschedule_from=#{reservation.id}" class="btn btn-sm btn-rcv-gold"><i class="fa fa-pencil me-1"/>Cambiar</a>
                                     <form t-if="row.get('can_cancel')" t-attf-action="/my/reservations/#{reservation.id}/cancel" method="post" class="m-0">
                                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                         <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Cancelar esta reserva?');">
@@ -116,15 +126,15 @@
     <template id="portal_my_reservation_page" name="Portal - Detalle de reserva">
         <t t-call="portal.portal_layout">
             <section class="my-3">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body">
+                <div class="card border-0 shadow-sm" style="border-left: 5px solid var(--rcv-gold, #B58A3D); border-radius: 18px;">
+                    <div class="card-body p-4">
                         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                             <div>
-                                <h3 class="mb-1 text-dark" t-out="reservation.name"/>
+                                <h3 class="mb-1 fw-bold" style="color: var(--rcv-brown, #2C1A0E);" t-out="reservation.name"/>
                                 <p class="mb-0 text-muted">
-                                    <i class="fa fa-clock-o me-1"/>
+                                    <i class="fa fa-calendar me-1"/>
                                     <span t-field="reservation.start_datetime" t-options="{'widget': 'datetime'}"/>
-                                    a
+                                    <span class="mx-1 opacity-50">→</span>
                                     <span t-field="reservation.end_datetime" t-options="{'widget': 'datetime'}"/>
                                 </p>
                             </div>
@@ -132,82 +142,82 @@
                         </div>
 
                         <div t-if="cancel_error == 'state'" class="alert alert-warning mt-3 mb-0 py-2 px-3 small">
-                            Esta reserva ya no se puede cancelar desde el portal porque ya esta en curso o finalizada.
+                            <i class="fa fa-info-circle me-1"/>Esta reserva ya no se puede cancelar porque ya esta en curso o finalizada.
                         </div>
                         <div t-if="cancel_error == 'blocked'" class="alert alert-danger mt-3 mb-0 py-2 px-3 small">
-                            No se pudo cancelar la reserva. Contacta al restaurante.
+                            <i class="fa fa-exclamation-circle me-1"/>No se pudo cancelar. Contacta al restaurante.
                         </div>
 
-                        <div class="row g-2 mt-3">
+                        <div class="row g-3 mt-2">
                             <div class="col-12 col-md-6">
-                                <div class="border rounded-3 p-3 bg-white">
-                                    <div class="text-muted small">Cliente</div>
-                                    <div class="fw-semibold" t-out="reservation.customer_name"/>
-                                    <div class="text-muted small mt-2">Telefono</div>
-                                    <div class="fw-semibold" t-out="reservation.customer_phone or 'Sin telefono'"/>
+                                <div class="rcv-reservation-info-block h-100">
+                                    <span class="rcv-info-label">Cliente</span>
+                                    <span class="rcv-info-value d-block" t-out="reservation.customer_name"/>
+                                    <span class="rcv-info-label mt-2">Telefono</span>
+                                    <span class="rcv-info-value d-block" t-out="reservation.customer_phone or 'Sin telefono'"/>
                                 </div>
                             </div>
                             <div class="col-12 col-md-6">
-                                <div class="border rounded-3 p-3 bg-white">
-                                    <div class="text-muted small">Personas</div>
-                                    <div class="fw-semibold" t-out="reservation.party_size"/>
-                                    <div class="text-muted small mt-2">Zona y mesa</div>
-                                    <div class="fw-semibold">
+                                <div class="rcv-reservation-info-block h-100">
+                                    <span class="rcv-info-label">Personas</span>
+                                    <span class="rcv-info-value d-block"><t t-out="reservation.party_size"/> personas</span>
+                                    <span class="rcv-info-label mt-2">Zona y mesa</span>
+                                    <span class="rcv-info-value d-block">
                                         <t t-if="reservation.zone == 'main'">Interior</t>
                                         <t t-if="reservation.zone == 'patio'">Patio</t>
-                                        - Mesa <t t-out="reservation.table_id.table_number or '-'"/>
-                                    </div>
+                                        — Mesa <t t-out="reservation.table_id.table_number or '-'"/>
+                                    </span>
                                 </div>
                             </div>
                             <div class="col-12">
-                                <div class="border rounded-3 p-3 bg-white">
-                                    <div class="text-muted small">Arreglo especial</div>
-                                    <div class="fw-semibold">
+                                <div class="rcv-reservation-info-block">
+                                    <span class="rcv-info-label">Arreglo especial</span>
+                                    <span class="rcv-info-value d-block">
                                         <t t-if="reservation.arrangement_product_id"><t t-out="reservation.arrangement_product_id.name"/></t>
                                         <t t-else=""><t t-out="reservation._get_arrangement_label(reservation.arrangement_type)"/></t>
-                                    </div>
+                                    </span>
                                     <t t-if="reservation.notes">
-                                        <div class="text-muted small mt-2">Notas</div>
-                                        <div t-out="reservation.notes"/>
+                                        <span class="rcv-info-label mt-2">Notas</span>
+                                        <span class="rcv-info-value d-block fst-italic" t-out="reservation.notes"/>
                                     </t>
                                 </div>
                             </div>
                             <div class="col-12">
-                                <div class="border rounded-3 p-3 bg-white">
+                                <div class="rcv-reservation-info-block">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <div class="text-muted small">Pre-orden (se cobra en mesa)</div>
-                                        <div class="fw-semibold">Total estimado: <span t-field="reservation.pre_order_total"/></div>
+                                        <span class="rcv-info-label">Pre-orden <span class="text-lowercase">(se cobra en mesa)</span></span>
+                                        <span class="fw-bold" style="color: var(--rcv-brown, #2C1A0E);">Total: <span t-field="reservation.pre_order_total"/></span>
                                     </div>
                                     <t t-if="reservation.pre_order_line_ids">
-                                        <ul class="list-unstyled mb-0">
+                                        <ul class="list-unstyled mb-0 d-flex flex-column gap-2">
                                             <t t-foreach="reservation.pre_order_line_ids" t-as="line">
-                                                <li class="mb-2">
+                                                <li class="d-flex justify-content-between align-items-start small">
                                                     <div>
-                                                        <strong t-out="line.qty"/> x <span t-out="line.product_id.display_name"/>
-                                                        <span class="text-muted">(<span t-field="line.price_subtotal"/>)</span>
+                                                        <span class="fw-semibold" t-out="line.qty"/> × <span t-out="line.product_id.display_name"/>
+                                                        <t t-if="line.notes">
+                                                            <div class="text-muted fst-italic ps-2"><i class="fa fa-sticky-note-o me-1"/><t t-out="line.notes"/></div>
+                                                        </t>
                                                     </div>
-                                                    <div t-if="line.notes" class="small text-muted fst-italic ps-3">
-                                                        <i class="fa fa-sticky-note-o me-1"/><t t-out="line.notes"/>
-                                                    </div>
+                                                    <span class="text-muted ms-2 text-nowrap"><span t-field="line.price_subtotal"/></span>
                                                 </li>
                                             </t>
                                         </ul>
                                     </t>
-                                    <t t-else=""><span class="text-muted">Sin pre-orden.</span></t>
+                                    <t t-else=""><span class="text-muted small">Sin pre-orden registrada.</span></t>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="d-flex flex-wrap gap-2 mt-3">
-                            <a href="/my/reservations" class="btn btn-outline-secondary"><i class="fa fa-arrow-left me-1"/>Volver a mis reservas</a>
-                            <a t-if="can_cancel" t-attf-href="/reservas?reschedule_from=#{reservation.id}" class="btn btn-primary"><i class="fa fa-pencil me-1"/>Cambiar fecha/hora</a>
+                        <div class="d-flex flex-wrap gap-2 mt-4">
+                            <a href="/my/reservations" class="btn btn-outline-secondary"><i class="fa fa-arrow-left me-1"/>Volver</a>
+                            <a t-if="can_cancel" t-attf-href="/reservas?reschedule_from=#{reservation.id}" class="btn btn-rcv-gold"><i class="fa fa-pencil me-1"/>Cambiar fecha/hora</a>
                             <form t-if="can_cancel" t-attf-action="/my/reservations/#{reservation.id}/cancel" method="post" class="m-0">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                 <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Cancelar esta reserva?');">
                                     <i class="fa fa-times me-1"/>Cancelar reserva
                                 </button>
                             </form>
-                            <a t-if="not can_cancel" href="/reservas" class="btn btn-primary"><i class="fa fa-calendar-plus-o me-1"/>Nueva reserva</a>
+                            <a t-if="not can_cancel" href="/reservas" class="btn btn-rcv-gold"><i class="fa fa-calendar-plus-o me-1"/>Nueva reserva</a>
                         </div>
                     </div>
                 </div>

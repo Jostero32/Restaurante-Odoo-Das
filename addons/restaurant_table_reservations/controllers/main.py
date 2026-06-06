@@ -119,6 +119,7 @@ class RestaurantTableReservationController(http.Controller):
         ]
 
         schedule_status = reservation_model._get_schedule_status_for_date(kwargs.get("date"))
+        schedule = reservation_model._get_business_schedule()
 
         return {
             "zone_options": zone_options,
@@ -135,6 +136,8 @@ class RestaurantTableReservationController(http.Controller):
             "reservation_buffer_minutes": reservation_model.BUFFER_MINUTES,
             "schedule_is_open": schedule_status["is_open"],
             "schedule_message": schedule_status["message"],
+            "schedule_max_days": schedule.max_schedule_days or 7,
+            "schedule_min_lead_minutes": schedule.min_lead_time_minutes or 0,
         }
 
     @http.route(["/reservas", "/reservas/mesa"], type="http", auth="user", website=True, sitemap=True)
@@ -211,6 +214,38 @@ class RestaurantTableReservationController(http.Controller):
 
             partner = request.env.user.partner_id.commercial_partner_id
             reservation_model = request.env["restaurant.table.reservation"].sudo()
+
+            # Adquirir un lock exclusivo sobre la fila de la mesa ANTES de verificar
+            # disponibilidad. Esto serializa reservas concurrentes para la misma mesa
+            # y elimina la ventana de doble-reserva entre el chequeo y el INSERT.
+            try:
+                request.env.cr.execute(
+                    "SELECT id FROM restaurant_table WHERE id = %s FOR UPDATE",
+                    (table_id,),
+                )
+                if not request.env.cr.fetchone():
+                    raise ValidationError(_("La mesa seleccionada no existe."))
+            except ValidationError:
+                raise
+            except Exception:
+                raise ValidationError(
+                    _("No fue posible verificar la disponibilidad de la mesa. Intenta de nuevo.")
+                )
+
+            # Re-validar disponibilidad en el servidor, ya con el lock, por si
+            # otra solicitud concurrente acabo de tomar la mesa entre el form y el POST.
+            end_dt_check = reservation_model._get_end_datetime(start_datetime)
+            conflicto = reservation_model.search_count([
+                ("table_id", "=", table_id),
+                ("state", "not in", ("cancelled", "done")),
+                ("start_datetime", "<", fields.Datetime.to_string(end_dt_check)),
+                ("end_datetime", ">", fields.Datetime.to_string(start_datetime)),
+            ])
+            if conflicto:
+                raise ValidationError(
+                    _("La mesa fue reservada por otro usuario en este momento. Por favor elige otra mesa u horario.")
+                )
+
             arrangement_product_id = self._safe_int(post.get("arrangement_product_id"), 0)
             reservation_vals = {
                 "partner_id": partner.id,

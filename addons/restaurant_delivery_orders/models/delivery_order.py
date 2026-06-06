@@ -49,14 +49,6 @@ class RestaurantDeliveryOrder(models.Model):
         default=lambda self: self.env.company.currency_id,
         required=True,
     )
-    delivery_user_id = fields.Many2one("res.users", string="Repartidor", tracking=True)
-    driver_id = fields.Many2one(
-        "res.users",
-        string="Repartidor",
-        related="delivery_user_id",
-        readonly=False,
-        store=False,
-    )
     notes = fields.Text(string="Notas")
     state = fields.Selection(
         [
@@ -78,6 +70,7 @@ class RestaurantDeliveryOrder(models.Model):
         string="Pedido de venta",
         copy=False,
         tracking=True,
+        ondelete="set null",
     )
     is_scheduled = fields.Boolean(
         string="Programado",

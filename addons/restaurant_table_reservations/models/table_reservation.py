@@ -39,7 +39,13 @@ class RestaurantTableReservation(models.Model):
         default="main",
         tracking=True,
     )
-    table_id = fields.Many2one("restaurant.table", string="Mesa", required=True, tracking=True)
+    table_id = fields.Many2one(
+        "restaurant.table",
+        string="Mesa",
+        required=True,
+        tracking=True,
+        ondelete="restrict",
+    )
     start_datetime = fields.Datetime(string="Inicio", required=True, tracking=True)
     end_datetime = fields.Datetime(string="Fin", required=True, tracking=True)
     notes = fields.Text(string="Notas")
@@ -175,6 +181,19 @@ class RestaurantTableReservation(models.Model):
             return {"is_open": True, "message": ""}
         selected_date = fields.Date.from_string(date_value) if isinstance(date_value, str) else date_value
         schedule = self._get_business_schedule()
+
+        # Verificar ventana maxima de reserva
+        max_days = schedule.max_schedule_days or 0
+        if max_days > 0:
+            today = fields.Date.context_today(self)
+            if (selected_date - today).days > max_days:
+                return {
+                    "is_open": False,
+                    "message": _("Solo se pueden hacer reservas con hasta %(days)s dias de anticipacion.") % {
+                        "days": max_days
+                    },
+                }
+
         exception = schedule._exception_for_date(selected_date)
         if exception and exception.is_closed:
             return {
@@ -304,8 +323,28 @@ class RestaurantTableReservation(models.Model):
         if start_datetime < current_utc:
             raise ValidationError(_("No puedes reservar en un horario anterior al momento actual."))
         schedule = self._get_business_schedule()
+
+        # Anticipacion minima (min_lead_time_minutes)
+        min_lead = schedule.min_lead_time_minutes or 0
+        if min_lead > 0:
+            min_allowed = current_utc + timedelta(minutes=min_lead)
+            if start_datetime < min_allowed:
+                raise ValidationError(_(
+                    "La reserva debe solicitarse con al menos %(min)s minutos de anticipacion."
+                ) % {"min": min_lead})
+
         local_start = schedule._to_company_local(start_datetime)
         local_date = local_start.date()
+
+        # Ventana maxima de reserva (max_schedule_days)
+        max_days = schedule.max_schedule_days or 0
+        if max_days > 0:
+            local_today = schedule._to_company_local(current_utc).date()
+            if (local_date - local_today).days > max_days:
+                raise ValidationError(_(
+                    "Solo se pueden hacer reservas con hasta %(days)s dias de anticipacion."
+                ) % {"days": max_days})
+
         exception = schedule._exception_for_date(local_date)
         if exception and exception.is_closed:
             raise ValidationError(_("El restaurante esta cerrado el %(date)s: %(reason)s.") % {
@@ -337,10 +376,11 @@ class RestaurantTableReservation(models.Model):
             return []
         step_minutes = schedule.slot_minutes or 15
         today_local = fields.Date.context_today(self)
-        now_decimal = None
+        min_cutoff_decimal = None
         if selected_date == today_local:
             now_local = fields.Datetime.context_timestamp(self, fields.Datetime.now())
-            now_decimal = now_local.hour + now_local.minute / 60.0
+            min_lead_hours = (schedule.min_lead_time_minutes or 0) / 60.0
+            min_cutoff_decimal = now_local.hour + now_local.minute / 60.0 + min_lead_hours
         reservation_hours = self.RESERVATION_MINUTES / 60.0
         options = []
         seen = set()
@@ -353,7 +393,7 @@ class RestaurantTableReservation(models.Model):
             max_minutes = int(round(max_start_decimal * 60))
             for minutes in range(start_minutes, max_minutes + 1, step_minutes):
                 decimal = minutes / 60.0
-                if now_decimal is not None and decimal < now_decimal:
+                if min_cutoff_decimal is not None and decimal < min_cutoff_decimal:
                     continue
                 label = f"{minutes // 60:02d}:{minutes % 60:02d}"
                 if label in seen:
@@ -519,6 +559,25 @@ class RestaurantTableReservation(models.Model):
             start_datetime = fields.Datetime.to_datetime(vals["start_datetime"])
             self._validate_requested_start_datetime(start_datetime)
             vals["end_datetime"] = fields.Datetime.to_string(self._get_end_datetime(start_datetime))
+
+        # Proteger pre-orden ya cobrada: impedir agregar, modificar o quitar lineas.
+        if "pre_order_line_ids" in vals:
+            for reservation in self:
+                if reservation.pre_order_lines_charged:
+                    raise ValidationError(
+                        _("No se puede modificar la pre-orden de la reserva %(name)s porque ya fue cobrada en caja.")
+                        % {"name": reservation.name}
+                    )
+
+        # Proteger arreglo ya cobrado: impedir cambiar el tipo o producto de arreglo.
+        if "arrangement_product_id" in vals or "arrangement_type" in vals:
+            for reservation in self:
+                if reservation.arrangement_charged:
+                    raise ValidationError(
+                        _("No se puede cambiar el arreglo de la reserva %(name)s porque ya fue cobrado en caja.")
+                        % {"name": reservation.name}
+                    )
+
         return super().write(vals)
 
     # ------------------------------------------------------------------
