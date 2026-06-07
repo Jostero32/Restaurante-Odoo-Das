@@ -182,11 +182,25 @@ class RestaurantTable(models.Model):
         if open_pos_order and product:
             already = open_pos_order.lines.filtered(lambda l: l.product_id.id == product.id)
             if not already:
+                price_unit = reservation._get_arrangement_cost()
+                tax_ids = product.taxes_id.filtered_domain(
+                    self.env["account.tax"]._check_company_domain(open_pos_order.company_id)
+                )
+                if open_pos_order.fiscal_position_id:
+                    tax_ids = open_pos_order.fiscal_position_id.map_tax(tax_ids)
+                currency = open_pos_order.currency_id or self.env.company.currency_id
+                tax_result = tax_ids.compute_all(
+                    price_unit, currency, 1.0,
+                    product=product, partner=open_pos_order.partner_id,
+                )
                 self.env["pos.order.line"].sudo().create({
                     "order_id": open_pos_order.id,
                     "product_id": product.id,
                     "qty": 1.0,
-                    "price_unit": reservation._get_arrangement_cost(),
+                    "price_unit": price_unit,
+                    "tax_ids": [(6, 0, tax_ids.ids)],
+                    "price_subtotal": tax_result["total_excluded"],
+                    "price_subtotal_incl": tax_result["total_included"],
                 })
 
         reservation.sudo().write({"arrangement_charged": True})

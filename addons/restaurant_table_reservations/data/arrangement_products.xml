@@ -1,10 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
+    <!--
+        noupdate="1" protects the category records from being overwritten on
+        module upgrades if the user renamed them from the backend.
+    -->
     <data noupdate="1">
+        <!-- Product category (internal / accounting) -->
         <record id="product_categ_arrangements" model="product.category">
             <field name="name">Arreglos de Mesa</field>
         </record>
+
+        <!--
+            POS category for arrangement products.
+
+            IMPORTANT — kitchen printer exclusion:
+            After installing / upgrading the module, go to:
+              Point of Sale → Configuration → Settings → [your POS] → Connected Devices → Order Printers
+            Edit each kitchen printer route and make sure the "Arreglos de Mesa" POS category
+            is NOT included in the printer's category filter.  That way arrangement lines
+            are printed only on the customer receipt / fiscal invoice but never sent to the
+            kitchen display or thermal ticket printer.
+        -->
+        <record id="pos_categ_arreglos" model="pos.category">
+            <field name="name">Arreglos de Mesa</field>
+            <field name="sequence">99</field>
+        </record>
     </data>
+
+    <!--
+        noupdate="0" so prices and descriptions are refreshed on every upgrade.
+        available_in_pos must be True for the product to be loadable in the
+        POS session and for mark_reservation_charged_for_table to find it.
+
+        pos_categ_ids links each product to the "Arreglos de Mesa" POS category,
+        which the admin can then exclude from all kitchen printer routes (see above).
+    -->
     <data noupdate="0">
         <record id="product_arrangement_birthday" model="product.template">
             <field name="name">Decoración Cumpleaños</field>
@@ -12,6 +42,8 @@
             <field name="type">service</field>
             <field name="list_price">10.0</field>
             <field name="sale_ok">True</field>
+            <field name="available_in_pos">True</field>
+            <field name="pos_categ_ids" eval="[(4, ref('pos_categ_arreglos'))]"/>
             <field name="description_sale">Globos, banderines y centro de mesa tematico de cumpleanos.</field>
             <field name="categ_id" ref="product_categ_arrangements"/>
         </record>
@@ -22,6 +54,8 @@
             <field name="type">service</field>
             <field name="list_price">15.0</field>
             <field name="sale_ok">True</field>
+            <field name="available_in_pos">True</field>
+            <field name="pos_categ_ids" eval="[(4, ref('pos_categ_arreglos'))]"/>
             <field name="description_sale">Mantel especial, velas y arreglo floral para celebrar tu aniversario.</field>
             <field name="categ_id" ref="product_categ_arrangements"/>
         </record>
@@ -32,6 +66,8 @@
             <field name="type">service</field>
             <field name="list_price">20.0</field>
             <field name="sale_ok">True</field>
+            <field name="available_in_pos">True</field>
+            <field name="pos_categ_ids" eval="[(4, ref('pos_categ_arreglos'))]"/>
             <field name="description_sale">Petalos de rosa, velas y luz tenue para una noche especial.</field>
             <field name="categ_id" ref="product_categ_arrangements"/>
         </record>
@@ -42,6 +78,8 @@
             <field name="type">service</field>
             <field name="list_price">5.0</field>
             <field name="sale_ok">True</field>
+            <field name="available_in_pos">True</field>
+            <field name="pos_categ_ids" eval="[(4, ref('pos_categ_arreglos'))]"/>
             <field name="description_sale">Detalle simple: mantel especial y arreglo central liviano.</field>
             <field name="categ_id" ref="product_categ_arrangements"/>
         </record>
@@ -52,6 +90,8 @@
             <field name="type">service</field>
             <field name="list_price">12.0</field>
             <field name="sale_ok">True</field>
+            <field name="available_in_pos">True</field>
+            <field name="pos_categ_ids" eval="[(4, ref('pos_categ_arreglos'))]"/>
             <field name="description_sale">Arco de globos coloridos sobre la mesa, ideal para festejos.</field>
             <field name="categ_id" ref="product_categ_arrangements"/>
         </record>
@@ -62,6 +102,8 @@
             <field name="type">service</field>
             <field name="list_price">18.0</field>
             <field name="sale_ok">True</field>
+            <field name="available_in_pos">True</field>
+            <field name="pos_categ_ids" eval="[(4, ref('pos_categ_arreglos'))]"/>
             <field name="description_sale">Centro de mesa con flores frescas de temporada.</field>
             <field name="categ_id" ref="product_categ_arrangements"/>
         </record>
@@ -72,6 +114,8 @@
             <field name="type">service</field>
             <field name="list_price">25.0</field>
             <field name="sale_ok">True</field>
+            <field name="available_in_pos">True</field>
+            <field name="pos_categ_ids" eval="[(4, ref('pos_categ_arreglos'))]"/>
             <field name="description_sale">Decoracion colorida para niños: globos, gorritos y sorpresas.</field>
             <field name="categ_id" ref="product_categ_arrangements"/>
         </record>
@@ -82,6 +126,8 @@
             <field name="type">service</field>
             <field name="list_price">35.0</field>
             <field name="sale_ok">True</field>
+            <field name="available_in_pos">True</field>
+            <field name="pos_categ_ids" eval="[(4, ref('pos_categ_arreglos'))]"/>
             <field name="description_sale">Mantel premium, vajilla especial, flores y velas. Para ocasiones unicas.</field>
             <field name="categ_id" ref="product_categ_arrangements"/>
         </record>

@@ -614,7 +614,36 @@ class RestaurantTableReservation(models.Model):
 
     def action_confirm(self):
         self.write({"state": "confirmed"})
+        # Create a draft POS order immediately so the floor map shows the table
+        # occupied as soon as the customer confirms online. Only creates if there
+        # is an open session; silently skips when the reservation is far in advance.
+        self._create_pos_order_for_reservation()
+        self._inject_pre_order_lines_into_pos_order()
         self._notify_pos_reservation_change()
+
+    # ------------------------------------------------------------------
+    # Proxy methods called by the POS JS on this model
+    # (the real implementations live on restaurant.table for reuse)
+    # ------------------------------------------------------------------
+
+    @api.model
+    def get_pos_reservation_snapshot(self, config_id=None):
+        """Return the reservation snapshot keyed by table_id.
+
+        Called by pos_reservation_pos.js via this.data.call(
+            "restaurant.table.reservation", "get_pos_reservation_snapshot", ...)
+        Delegates to the canonical implementation on restaurant.table.
+        """
+        return self.env["restaurant.table"].sudo().get_pos_reservation_snapshot(config_id)
+
+    @api.model
+    def finalize_pos_reservation_for_table(self, table_id):
+        """Mark the active reservation for a table as done once the POS order is finalized.
+
+        Called by pos_reservation_pos.js via this.data.call(
+            "restaurant.table.reservation", "finalize_pos_reservation_for_table", ...)
+        """
+        return self.env["restaurant.table"].sudo().finalize_pos_reservation_for_table(table_id)
 
     def _create_pos_order_for_reservation(self):
         """Create an empty draft POS order for the table so it appears occupied in the floor map."""
