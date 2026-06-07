@@ -143,66 +143,17 @@ class RestaurantTable(models.Model):
 
     @api.model
     def mark_reservation_charged_for_table(self, table_id):
-        """Inject the arrangement line into the open POS order for the table.
+        """Mark the arrangement as charged for a table's active reservation.
 
-        Only touches POS orders in 'draft' state to avoid contaminating
-        finalized/invoiced orders. Returns True if reservation was found.
+        The arrangement line is now injected server-side by
+        _inject_pre_order_lines_into_pos_order() together with the food lines,
+        so this method only needs to set arrangement_charged = True as a safety
+        net (e.g. when called from syncAllOrders in the POS JS after the order
+        is finalized). It no longer inserts a duplicate line.
         """
         reservation = self._get_active_reservation_for_table(table_id)
         if not reservation:
             return False
-
-        # Prefer arrangement_product_id; fall back to legacy code_map
-        if reservation.arrangement_product_id:
-            product = self.env["product.product"].sudo().search(
-                [("product_tmpl_id", "=", reservation.arrangement_product_id.id)], limit=1
-            )
-        elif reservation.arrangement_type and reservation.arrangement_type != "none":
-            code_map = {
-                "birthday": "ARR-BIRTHDAY",
-                "anniversary": "ARR-ANNIV",
-                "romantic": "ARR-ROMANTIC",
-                "general": "ARR-GENERAL",
-            }
-            default_code = code_map.get(reservation.arrangement_type, "")
-            product = (
-                self.env["product.product"].sudo().search([("default_code", "=", default_code)], limit=1)
-                if default_code
-                else self.env["product.product"]
-            )
-        else:
-            product = self.env["product.product"]
-
-        open_pos_order = self.env["pos.order"].sudo().search(
-            [("table_id", "=", table_id), ("state", "=", "draft")],
-            order="id desc",
-            limit=1,
-        )
-
-        if open_pos_order and product:
-            already = open_pos_order.lines.filtered(lambda l: l.product_id.id == product.id)
-            if not already:
-                price_unit = reservation._get_arrangement_cost()
-                tax_ids = product.taxes_id.filtered_domain(
-                    self.env["account.tax"]._check_company_domain(open_pos_order.company_id)
-                )
-                if open_pos_order.fiscal_position_id:
-                    tax_ids = open_pos_order.fiscal_position_id.map_tax(tax_ids)
-                currency = open_pos_order.currency_id or self.env.company.currency_id
-                tax_result = tax_ids.compute_all(
-                    price_unit, currency, 1.0,
-                    product=product, partner=open_pos_order.partner_id,
-                )
-                self.env["pos.order.line"].sudo().create({
-                    "order_id": open_pos_order.id,
-                    "product_id": product.id,
-                    "qty": 1.0,
-                    "price_unit": price_unit,
-                    "tax_ids": [(6, 0, tax_ids.ids)],
-                    "price_subtotal": tax_result["total_excluded"],
-                    "price_subtotal_incl": tax_result["total_included"],
-                })
-
         reservation.sudo().write({"arrangement_charged": True})
         reservation._notify_pos_reservation_change([reservation.table_id.id])
         return True

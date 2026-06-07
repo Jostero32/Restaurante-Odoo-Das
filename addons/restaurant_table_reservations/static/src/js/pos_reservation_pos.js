@@ -94,20 +94,33 @@ patch(PosStore.prototype, {
     },
 
     /**
-     * Pull any draft pos.orders that were created server-side (e.g. from a web
-     * reservation) into the POS local model store so the floor map shows them.
+     * Pull any draft pos.orders — and their lines — that were created server-side
+     * (e.g. from a web reservation) into the POS local model store so the floor
+     * map shows them occupied and the cart shows pre-ordered items.
      *
-     * In Odoo 17 PosData.searchRead automatically upserts results into the
-     * reactive model registry, which triggers Owl re-renders.
+     * In Odoo 18, PosData.searchRead upserts results into the reactive model
+     * registry, which triggers Owl re-renders automatically. We load lines
+     * explicitly because pos.order.line is a One2many child and may not be
+     * pulled in the same request as the parent order.
      */
     async _loadNewServerOrders() {
         try {
             const sessionId =
                 this.session?.id || this.config?.current_session_id?.id;
             if (!sessionId) return;
+
+            // 1. Load / refresh all draft orders for this session
             await this.data.searchRead("pos.order", [
                 ["session_id", "=", sessionId],
                 ["state", "=", "draft"],
+            ]);
+
+            // 2. Load the lines for those orders so the cart shows pre-order items.
+            //    Without this step the order header appears (table turns green) but
+            //    the POS cart is empty — causing the receipt to show $0.00.
+            await this.data.searchRead("pos.order.line", [
+                ["order_id.session_id", "=", sessionId],
+                ["order_id.state", "=", "draft"],
             ]);
         } catch {
             // silent — visual fallback via snapshot polling still works

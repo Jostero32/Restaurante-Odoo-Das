@@ -1,3 +1,4 @@
+import base64
 from datetime import timedelta
 from collections import OrderedDict
 
@@ -120,11 +121,25 @@ class RestaurantTableReservation(models.Model):
         help="Las lineas de pre-orden ya fueron volcadas al POS para evitar duplicados.",
     )
 
-    @api.depends("pre_order_line_ids.price_subtotal", "pre_order_line_ids.qty")
+    grand_total = fields.Monetary(
+        string="Total estimado (comida + arreglo)",
+        compute="_compute_pre_order_totals",
+        store=True,
+        currency_field="currency_id",
+        help="Suma de la pre-orden más el costo del arreglo de mesa seleccionado.",
+    )
+
+    @api.depends(
+        "pre_order_line_ids.price_subtotal",
+        "pre_order_line_ids.qty",
+        "arrangement_product_id",
+        "arrangement_type",
+    )
     def _compute_pre_order_totals(self):
         for reservation in self:
             reservation.pre_order_total = sum(reservation.pre_order_line_ids.mapped("price_subtotal"))
             reservation.pre_order_count = int(sum(reservation.pre_order_line_ids.mapped("qty")))
+            reservation.grand_total = reservation.pre_order_total + reservation._get_arrangement_cost()
 
     def _get_arrangement_cost(self):
         """Return the numeric cost: prefer arrangement_product_id, fallback to legacy type."""
@@ -225,6 +240,34 @@ class RestaurantTableReservation(models.Model):
     ]
 
     @api.model
+    def _product_image_data_url(self, b64_data):
+        """Convert a base64 Binary field value to a data-URL for inline embedding.
+
+        Product images require website_published=True to be served via
+        /web/image to public/portal users (Odoo 18 ir.rule). Embedding the
+        image as a data-URL in the controller response bypasses that rule
+        because the data is already included in the HTML — no extra browser
+        request is needed.
+        """
+        if not b64_data:
+            return ""
+        try:
+            raw = base64.b64decode(b64_data)
+        except Exception:
+            return ""
+        if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+            mime = "image/webp"
+        elif raw[:8] == b"\x89PNG\r\n\x1a\n":
+            mime = "image/png"
+        elif raw[:3] == b"\xff\xd8\xff":
+            mime = "image/jpeg"
+        elif raw[:4] in (b"GIF8", b"GIF9"):
+            mime = "image/gif"
+        else:
+            mime = "image/png"
+        return f"data:{mime};base64,{b64_data.decode('ascii') if isinstance(b64_data, bytes) else b64_data}"
+
+    @api.model
     def _get_arrangement_products(self):
         """Return the 4 arrangement service products for the website form.
 
@@ -258,7 +301,7 @@ class RestaurantTableReservation(models.Model):
                 'price': p.list_price,
                 'label': f"{p.name} +${p.list_price:.2f}",
                 'description': p.description_sale or "",
-                'image_url': f"/web/image/product.template/{p.id}/image_128",
+                'image_url': self._product_image_data_url(p.sudo().image_128),
             }
             for p in seen.values()
         ]
@@ -282,7 +325,7 @@ class RestaurantTableReservation(models.Model):
                     "price": product.lst_price,
                     "currency_symbol": self.env.company.currency_id.symbol or "$",
                     "uom_name": product.uom_id.name or "",
-                    "image_url": f"/web/image/product.product/{product.id}/image_128",
+                    "image_url": self._product_image_data_url(product.sudo().image_128),
                     "description": product.description_sale or "",
                     "follows_party_size": bool(product.product_tmpl_id.preorder_qty_follows_party_size),
                 }
@@ -698,11 +741,21 @@ class RestaurantTableReservation(models.Model):
     # ------------------------------------------------------------------
 
     def _inject_pre_order_lines_into_pos_order(self):
+        """Inject pre-order food lines and the arrangement line into the draft POS order.
+
+        Both are injected in the same call so the mesero sees a complete order:
+        food items first, arrangement at the end (as a service charge).
+        _compute_prices() is called explicitly after all lines are created because
+        in Odoo 18 it is an @api.onchange and does not fire from Python code.
+        """
         PosOrder = self.env["pos.order"].sudo()
         PosOrderLine = self.env["pos.order.line"].sudo()
         for reservation in self:
-            if reservation.pre_order_lines_charged or not reservation.pre_order_line_ids:
+            has_food = bool(reservation.pre_order_line_ids) and not reservation.pre_order_lines_charged
+            has_arrangement = bool(reservation.arrangement_product_id) and not reservation.arrangement_charged
+            if not has_food and not has_arrangement:
                 continue
+
             order = PosOrder.search(
                 [
                     ("table_id", "=", reservation.table_id.id),
@@ -713,36 +766,80 @@ class RestaurantTableReservation(models.Model):
             )
             if not order:
                 continue
-            for line in reservation.pre_order_line_ids:
-                already = order.lines.filtered(
-                    lambda ol: ol.product_id == line.product_id and ol.reservation_id == reservation
-                )
-                if already:
-                    continue
-                product = line.product_id
-                tax_ids = product.taxes_id.filtered_domain(
-                    self.env["account.tax"]._check_company_domain(order.company_id)
-                )
-                if order.fiscal_position_id:
-                    tax_ids = order.fiscal_position_id.map_tax(tax_ids)
-                price = line.price_unit * (1 - 0.0 / 100.0)
-                tax_result = tax_ids.compute_all(
-                    price, order.currency_id, line.qty,
-                    product=product, partner=order.partner_id,
-                )
+
+            # --- 1. Food / pre-order lines -----------------------------------
+            if has_food:
                 preface = _("Pre-orden reserva %s.") % reservation.name
-                PosOrderLine.create({
-                    "order_id": order.id,
-                    "product_id": product.id,
-                    "qty": line.qty,
-                    "price_unit": line.price_unit,
-                    "tax_ids": [(6, 0, tax_ids.ids)],
-                    "price_subtotal": tax_result["total_excluded"],
-                    "price_subtotal_incl": tax_result["total_included"],
-                    "reservation_id": reservation.id,
-                    "note": f"{preface} {line.notes}" if line.notes else preface,
-                })
-            reservation.sudo().write({"pre_order_lines_charged": True})
+                for line in reservation.pre_order_line_ids:
+                    already = order.lines.filtered(
+                        lambda ol, _line=line, _res=reservation: (
+                            ol.product_id == _line.product_id
+                            and ol.reservation_id == _res
+                        )
+                    )
+                    if already:
+                        continue
+                    product = line.product_id
+                    tax_ids = product.taxes_id.filtered_domain(
+                        self.env["account.tax"]._check_company_domain(order.company_id)
+                    )
+                    if order.fiscal_position_id:
+                        tax_ids = order.fiscal_position_id.map_tax(tax_ids)
+                    tax_result = tax_ids.compute_all(
+                        line.price_unit, order.currency_id, line.qty,
+                        product=product, partner=order.partner_id,
+                    )
+                    PosOrderLine.create({
+                        "order_id": order.id,
+                        "product_id": product.id,
+                        "qty": line.qty,
+                        "price_unit": line.price_unit,
+                        "tax_ids": [(6, 0, tax_ids.ids)],
+                        "price_subtotal": tax_result["total_excluded"],
+                        "price_subtotal_incl": tax_result["total_included"],
+                        "reservation_id": reservation.id,
+                        "note": f"{preface} {line.notes}" if line.notes else preface,
+                    })
+                reservation.sudo().write({"pre_order_lines_charged": True})
+
+            # --- 2. Arrangement line (at the end, as a service charge) -------
+            if has_arrangement:
+                arr_product_tmpl = reservation.arrangement_product_id
+                arr_product = self.env["product.product"].sudo().search(
+                    [("product_tmpl_id", "=", arr_product_tmpl.id)], limit=1
+                )
+                if arr_product:
+                    already_arr = order.lines.filtered(
+                        lambda ol, _p=arr_product: ol.product_id == _p
+                    )
+                    if not already_arr:
+                        price_unit = arr_product_tmpl.list_price
+                        arr_tax_ids = arr_product.taxes_id.filtered_domain(
+                            self.env["account.tax"]._check_company_domain(order.company_id)
+                        )
+                        if order.fiscal_position_id:
+                            arr_tax_ids = order.fiscal_position_id.map_tax(arr_tax_ids)
+                        currency = order.currency_id or self.env.company.currency_id
+                        arr_tax_result = arr_tax_ids.compute_all(
+                            price_unit, currency, 1.0,
+                            product=arr_product, partner=order.partner_id,
+                        )
+                        arr_note = _("Arreglo de mesa — reserva %s.") % reservation.name
+                        PosOrderLine.create({
+                            "order_id": order.id,
+                            "product_id": arr_product.id,
+                            "qty": 1.0,
+                            "price_unit": price_unit,
+                            "tax_ids": [(6, 0, arr_tax_ids.ids)],
+                            "price_subtotal": arr_tax_result["total_excluded"],
+                            "price_subtotal_incl": arr_tax_result["total_included"],
+                            "note": arr_note,
+                        })
+                reservation.sudo().write({"arrangement_charged": True})
+
+            # Recalculate pos.order totals — _compute_prices() is @api.onchange
+            # in Odoo 18 and does NOT fire automatically from Python.
+            order._compute_prices()
 
     def _notify_pos_reservation_change(self, table_ids=None):
         self.env["bus.bus"]._sendone(
