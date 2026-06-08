@@ -12,7 +12,12 @@ class ProductProduct(models.Model):
         sub-versiones de Odoo 18 (algunas usan `config_id`, otras `data`).
         Si la API cambia, igual exponemos los campos de cocina.
         """
-        extra_fields = ["kitchen_preparable", "kitchen_default_note"]
+        extra_fields = [
+            "kitchen_preparable",
+            "kitchen_default_note",
+            "kitchen_available_today",
+            "kitchen_allergens",
+        ]
         parent = getattr(super(), "_load_pos_data_fields", None)
         if parent is None:
             return extra_fields

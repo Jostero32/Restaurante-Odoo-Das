@@ -22,7 +22,31 @@
                             <field name="kitchen_preparable"/>
                             <field name="kitchen_default_note"
                                    invisible="not kitchen_preparable"/>
+                            <field name="kitchen_allergens"
+                                   invisible="not kitchen_preparable"
+                                   placeholder="Ej: gluten, mani, lacteos"/>
                         </group>
+                        <group string="Disponibilidad del dia">
+                            <field name="kitchen_available_today"
+                                   invisible="not kitchen_preparable"/>
+                            <button name="action_kitchen_mark_unavailable"
+                                    type="object"
+                                    string="Marcar agotado hoy"
+                                    class="btn-warning"
+                                    icon="fa-ban"
+                                    invisible="not kitchen_preparable or not kitchen_available_today"/>
+                            <button name="action_kitchen_mark_available"
+                                    type="object"
+                                    string="Reactivar plato"
+                                    class="btn-success"
+                                    icon="fa-check"
+                                    invisible="not kitchen_preparable or kitchen_available_today"/>
+                        </group>
+                    </group>
+                    <group string="Secuencia de preparacion"
+                           invisible="not kitchen_preparable">
+                        <field name="kitchen_prep_steps" nolabel="1"
+                               placeholder="Pasos para preparar el plato, en orden..."/>
                     </group>
                 </page>
             </xpath>

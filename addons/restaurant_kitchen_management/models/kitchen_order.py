@@ -99,11 +99,37 @@ class RestaurantKitchenOrder(models.Model):
         copy=False,
     )
     notes = fields.Text(string="Notas")
+    # Req 3: alergias del cliente
+    allergy_note = fields.Char(
+        string="Alergias del cliente",
+        help="Alergias o restricciones informadas por el cliente.",
+        tracking=True,
+    )
+    allergy_checked = fields.Boolean(
+        string="Se pregunto por alergias",
+        default=False,
+        tracking=True,
+        help="Marcar cuando se confirmo con el cliente si tiene alergias.",
+    )
+    allergy_alert = fields.Boolean(
+        string="Falta verificar alergias",
+        compute="_compute_allergy_alert",
+        help="Se enciende si la orden tiene platos preparables y aun no se "
+             "confirmo si el cliente tiene alergias.",
+    )
     line_ids = fields.One2many(
         "restaurant.kitchen.order.line",
         "kitchen_order_id",
         string="Lineas",
     )
+
+    # ------------------------------------------------------------------
+    # Computes
+    # ------------------------------------------------------------------
+    @api.depends("allergy_checked", "line_ids")
+    def _compute_allergy_alert(self):
+        for order in self:
+            order.allergy_alert = bool(order.line_ids) and not order.allergy_checked
 
     # ------------------------------------------------------------------
     # CRUD
@@ -284,6 +310,21 @@ class RestaurantKitchenOrder(models.Model):
         if not new_lines:
             return {"warning": _("Los productos ya fueron enviados a cocina.")}
 
+        # Req 2: bloquear platos AGOTADOS por hoy (86). El cocinero marca un
+        # plato como no disponible y el POS no debe poder enviarlo a cocina.
+        product_ids = [ld["product_id"] for ld in new_lines if ld.get("product_id")]
+        sold_out = self.env["product.product"].browse(product_ids).filtered(
+            lambda p: not p.product_tmpl_id.kitchen_available_today
+        )
+        if sold_out:
+            sold_out_ids = set(sold_out.ids)
+            new_lines = [ld for ld in new_lines if ld.get("product_id") not in sold_out_ids]
+            if not new_lines:
+                return {
+                    "warning": _("Plato(s) agotado(s) por hoy, no se pueden enviar a cocina: %s")
+                    % ", ".join(sold_out.mapped("display_name"))
+                }
+
         # Resolver mesa / cliente / sesion: primero del pos.order si existe,
         # si no del context_data enviado desde el POS frontend.
         pos_order = self.env["pos.order"].browse(pos_order_id) if pos_order_id else False
@@ -298,14 +339,22 @@ class RestaurantKitchenOrder(models.Model):
         partner_id = partner_id or context_data.get("partner_id") or False
         session_id = session_id or context_data.get("session_id") or False
 
+        # Req 3: datos de alergias enviados desde el POS (opcionales).
+        allergy_note = context_data.get("allergy_note") or ""
+        allergy_checked = bool(context_data.get("allergy_checked"))
+        sold_out_names = sold_out.mapped("display_name")
+
         # Si ya existe una orden activa para esta pos.order, le sumamos lineas
         # en lugar de crear una nueva. Asi soportamos pedidos modificados.
         active = existing.filtered(lambda k: k.state in ("new", "preparing"))
         if active:
             target = active[:1]
-            target.write({
-                "line_ids": [(0, 0, ld) for ld in new_lines],
-            })
+            append_vals = {"line_ids": [(0, 0, ld) for ld in new_lines]}
+            if allergy_note and not target.allergy_note:
+                append_vals["allergy_note"] = allergy_note
+            if allergy_checked and not target.allergy_checked:
+                append_vals["allergy_checked"] = True
+            target.write(append_vals)
             target.message_post(
                 body=_("Se agregaron %s productos adicionales desde POS.") % len(new_lines),
                 message_type="comment",
@@ -317,6 +366,7 @@ class RestaurantKitchenOrder(models.Model):
                 "name": target.name,
                 "line_count": len(new_lines),
                 "appended": True,
+                "sold_out": sold_out_names,
             }
 
         # Caso normal: crear orden nueva
@@ -326,6 +376,8 @@ class RestaurantKitchenOrder(models.Model):
             "pos_session_id": session_id,
             "table_id": table_id,
             "partner_id": partner_id,
+            "allergy_note": allergy_note,
+            "allergy_checked": allergy_checked,
             "line_ids": [(0, 0, ld) for ld in new_lines],
         })
         return {
@@ -333,6 +385,7 @@ class RestaurantKitchenOrder(models.Model):
             "name": kitchen_order.name,
             "line_count": len(new_lines),
             "appended": False,
+            "sold_out": sold_out_names,
         }
 
     @api.model

@@ -17,6 +17,7 @@
     'data': [
         'security/ir.model.access.csv',
         'data/kitchen_sequence.xml',
+        'data/kitchen_cron.xml',
         'views/kitchen_order_views.xml',
         'views/product_views.xml',
         'views/delivery_order_views.xml',

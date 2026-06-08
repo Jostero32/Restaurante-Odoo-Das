@@ -121,6 +121,13 @@ patch(ControlButtons.prototype, {
             this.notification.add(message, {
                 type: nonPreparableCount > 0 ? "info" : "success",
             });
+            // Req 2: avisar de platos agotados por hoy que no se enviaron.
+            if (result.sold_out && result.sold_out.length > 0) {
+                this.notification.add(
+                    _t("Agotado(s) por hoy, no enviado(s) a cocina: ") + result.sold_out.join(", "),
+                    { type: "warning", sticky: true }
+                );
+            }
         } catch (error) {
             const message = (error && error.data && error.data.message)
                 || (error && error.message)
